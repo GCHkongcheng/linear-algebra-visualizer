@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:math": "node scripts/run-math-tests.mjs"
   },
   "dependencies": {
+    "fraction.js": "^5.3.4",
+    "lucide-react": "^0.577.0",
+    "mathjs": "^15.1.1",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -25,3 +29,6 @@
     "typescript": "^5"
   }
 }
+
+
+
