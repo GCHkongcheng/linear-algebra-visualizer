@@ -7,12 +7,12 @@ import {
   Sigma,
   SplitSquareVertical,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MatrixGrid } from "@/components/matrix/MatrixGrid";
 import { MatrixShelf } from "@/components/matrix/MatrixShelf";
 import { OperationButtonGroup } from "@/components/matrix/OperationButtonGroup";
-import { ResultStateCard } from "@/components/matrix/ResultStateCard";
+import { ToastHost, type ToastItem } from "@/components/matrix/ToastHost";
 import { SaveToLibraryButton } from "@/components/matrix/SaveToLibraryButton";
 import { StepCard } from "@/components/matrix/StepCard";
 import { useMatrix } from "@/hooks/useMatrix";
@@ -205,6 +205,78 @@ export default function Home() {
     (state) => state.saveCurrentResultToLibrary
   );
   const [activeOperationTarget, setActiveOperationTarget] = useState<"A" | "B">("A");
+
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastSeqRef = useRef(0);
+  const toastTimersRef = useRef<Map<number, number>>(new Map());
+  const toastGroupRef = useRef<Map<string, number>>(new Map());
+
+  const dismissToast = useCallback((id: number) => {
+    const timer = toastTimersRef.current.get(id);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      toastTimersRef.current.delete(id);
+    }
+
+    setToasts((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (target) {
+        const groupedId = toastGroupRef.current.get(target.title);
+        if (groupedId === id) {
+          toastGroupRef.current.delete(target.title);
+        }
+      }
+      return prev.filter((item) => item.id !== id);
+    });
+  }, []);
+
+  const pushToast = useCallback(
+    (payload: Omit<ToastItem, "id">) => {
+      const existingId = toastGroupRef.current.get(payload.title);
+
+      if (existingId !== undefined) {
+        const timer = toastTimersRef.current.get(existingId);
+        if (timer !== undefined) {
+          window.clearTimeout(timer);
+        }
+
+        setToasts((prev) =>
+          prev.map((item) =>
+            item.id === existingId ? { id: existingId, ...payload } : item
+          )
+        );
+
+        const nextTimer = window.setTimeout(() => {
+          dismissToast(existingId);
+        }, 3600);
+        toastTimersRef.current.set(existingId, nextTimer);
+        return;
+      }
+
+      const id = Date.now() + toastSeqRef.current;
+      toastSeqRef.current += 1;
+
+      toastGroupRef.current.set(payload.title, id);
+      setToasts((prev) => [...prev, { id, ...payload }]);
+
+      const timer = window.setTimeout(() => {
+        dismissToast(id);
+      }, 3600);
+      toastTimersRef.current.set(id, timer);
+    },
+    [dismissToast]
+  );
+
+  useEffect(() => {
+    const timerMap = toastTimersRef.current;
+    const groupMap = toastGroupRef.current;
+
+    return () => {
+      timerMap.forEach((timer) => window.clearTimeout(timer));
+      timerMap.clear();
+      groupMap.clear();
+    };
+  }, []);
 
   const tabs = useMemo(
     () => [
@@ -463,6 +535,53 @@ export default function Home() {
     return decompResult.decomposition.L;
   }, [decompResult]);
 
+  useEffect(() => {
+    if (!matrix.operations.feedback) return;
+    pushToast({
+      tone: matrix.operations.feedback.tone,
+      title: "运算状态",
+      message: matrix.operations.feedback.text,
+    });
+  }, [matrix.operations.feedback, pushToast]);
+
+  useEffect(() => {
+    if (!matrix.system.feedback) return;
+    pushToast({
+      tone: matrix.system.feedback.tone,
+      title: "\u6c42\u89e3\u72b6\u6001",
+      message: matrix.system.feedback.text,
+      evidence: systemEvidence,
+    });
+  }, [matrix.system.feedback, systemEvidence, pushToast]);
+
+  useEffect(() => {
+    if (!detFeedback) return;
+    pushToast({
+      tone: detFeedback.tone,
+      title: "行列式状态",
+      message: detFeedback.text,
+    });
+  }, [detFeedback, pushToast]);
+
+  useEffect(() => {
+    if (!decompFeedback) return;
+    pushToast({
+      tone: decompFeedback.tone,
+      title: "\u5206\u89e3\u72b6\u6001",
+      message: decompFeedback.text,
+      evidence: decompEvidence,
+    });
+  }, [decompFeedback, decompEvidence, pushToast]);
+
+  useEffect(() => {
+    if (!eigFeedback) return;
+    pushToast({
+      tone: eigFeedback.tone,
+      title: "特征分析状态",
+      message: eigFeedback.text,
+    });
+  }, [eigFeedback, pushToast]);
+
   return (
     <div className="min-h-screen px-6 py-10 text-[15px] text-slate-900">
       <header className="mx-auto w-full max-w-6xl space-y-4">
@@ -656,11 +775,12 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {matrix.operations.feedback ? (
-                      <ResultStateCard tone={matrix.operations.feedback.tone} title="运算状态" message={matrix.operations.feedback.text} />
-                    ) : (
-                      <div className="text-sm text-slate-500">请选择运算并点击计算。</div>
-                    )}
+                    {/* status is shown via toast */}
+                    <div className="text-sm text-slate-500">
+                      {matrix.operations.feedback
+                        ? "运算状态已通过 Toast 提示。"
+                        : "请选择运算并点击计算。"}
+                    </div>
                     {matrix.operations.resultMatrix ? (
                       <>
                         <MatrixGrid matrix={matrix.operations.resultMatrix} displayMode={matrix.displayMode} />
@@ -838,16 +958,10 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {matrix.system.feedback ? (
-                      <ResultStateCard
-                        tone={matrix.system.feedback.tone}
-                        title="求解状态"
-                        message={matrix.system.feedback.text}
-                        evidence={systemEvidence}
-                      />
-                    ) : (
-                      <div className="text-sm text-slate-500">求解后查看结果摘要。</div>
-                    )}
+                    {/* status is shown via toast */}
+                    <div className="text-sm text-slate-500">
+                      {matrix.system.feedback ? "\u6c42\u89e3\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u6c42\u89e3\u540e\u67e5\u770b\u7ed3\u679c\u6458\u8981\u3002"}
+                    </div>
                     {matrix.system.summary ? (
                       <div className="space-y-2 text-sm">
                         <div>类型：{matrix.system.summary.type}</div>
@@ -934,11 +1048,10 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {detFeedback ? (
-                      <ResultStateCard tone={detFeedback.tone} title="行列式状态" message={detFeedback.text} />
-                    ) : (
-                      <div className="text-sm text-slate-500">输入矩阵后点击计算。</div>
-                    )}
+                    {/* status is shown via toast */}
+                    <div className="text-sm text-slate-500">
+                      {detFeedback ? "\u884c\u5217\u5f0f\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u8f93\u5165\u77e9\u9635\u540e\u70b9\u51fb\u8ba1\u7b97\u3002"}
+                    </div>
                     {detResult ? <div className="text-sm">det(A) = {matrix.formatValue(detResult)}</div> : null}
                   </div>
                 </aside>
@@ -1045,11 +1158,10 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {decompFeedback ? (
-                      <ResultStateCard tone={decompFeedback.tone} title="分解状态" message={decompFeedback.text} evidence={decompEvidence} />
-                    ) : (
-                      <div className="text-sm text-slate-500">选择分解模式后计算。</div>
-                    )}
+                    {/* status is shown via toast */}
+                    <div className="text-sm text-slate-500">
+                      {decompFeedback ? "\u5206\u89e3\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u9009\u62e9\u5206\u89e3\u6a21\u5f0f\u540e\u8ba1\u7b97\u3002"}
+                    </div>
 
                     {decompResult?.mode === "lu" ? (
                       <>
@@ -1133,11 +1245,10 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {eigFeedback ? (
-                      <ResultStateCard tone={eigFeedback.tone} title="特征分析状态" message={eigFeedback.text} />
-                    ) : (
-                      <div className="text-sm text-slate-500">输入矩阵后点击计算。</div>
-                    )}
+                    {/* status is shown via toast */}
+                    <div className="text-sm text-slate-500">
+                      {eigFeedback ? "\u7279\u5f81\u5206\u6790\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u8f93\u5165\u77e9\u9635\u540e\u70b9\u51fb\u8ba1\u7b97\u3002"}
+                    </div>
 
                     {eigResult ? (
                       <div className="space-y-4 text-sm text-slate-700">
@@ -1171,6 +1282,8 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
 
       <footer className="mx-auto mt-10 w-full max-w-6xl rounded-3xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-500">
         以矩阵为中心的工作流 · 默认启用列选主元
