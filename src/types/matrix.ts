@@ -50,9 +50,12 @@ export type IterativeSolveResult = {
   converged: boolean;
   iterations: number;
   residual: number;
+  spectralRadius: number | null;
+  convergenceGuaranteed: boolean | null;
   solution: string[];
   history: Array<{ iteration: number; vector: string[]; residual: number }>;
   note?: string;
+  convergenceMessage?: string;
 };
 
 export type MatrixOperationResult = {

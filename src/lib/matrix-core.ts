@@ -1529,6 +1529,212 @@ function maxAbsDelta(a: number[], b: number[]): number {
   return maxAbs;
 }
 
+function zeroNumericMatrix(rows: number, cols: number): number[][] {
+  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => 0));
+}
+
+function addNumericMatrices(a: number[][], b: number[][]): number[][] | null {
+  if (a.length !== b.length || a[0]?.length !== b[0]?.length) return null;
+  return a.map((row, r) =>
+    row.map((value, c) => normalizeNearZero(value + b[r][c]))
+  );
+}
+
+function scaleNumericMatrix(matrix: number[][], scalar: number): number[][] {
+  return matrix.map((row) =>
+    row.map((value) => normalizeNearZero(value * scalar))
+  );
+}
+
+function invertNumericMatrix(matrix: number[][]): number[][] | null {
+  const size = matrix.length;
+  if (!size || matrix.some((row) => row.length !== size)) return null;
+
+  const augmented = matrix.map((row, r) => [
+    ...row.map((value) => value),
+    ...Array.from({ length: size }, (_, c) => (c === r ? 1 : 0)),
+  ]);
+
+  for (let col = 0; col < size; col += 1) {
+    let pivotRow = col;
+    let maxAbs = Math.abs(augmented[col][col]);
+    for (let row = col + 1; row < size; row += 1) {
+      const abs = Math.abs(augmented[row][col]);
+      if (abs > maxAbs) {
+        maxAbs = abs;
+        pivotRow = row;
+      }
+    }
+
+    if (maxAbs < EPS) return null;
+
+    if (pivotRow !== col) {
+      [augmented[col], augmented[pivotRow]] = [augmented[pivotRow], augmented[col]];
+    }
+
+    const pivot = augmented[col][col];
+    for (let c = 0; c < augmented[col].length; c += 1) {
+      augmented[col][c] /= pivot;
+    }
+
+    for (let row = 0; row < size; row += 1) {
+      if (row === col) continue;
+      const factor = augmented[row][col];
+      if (Math.abs(factor) < EPS) continue;
+      for (let c = 0; c < augmented[row].length; c += 1) {
+        augmented[row][c] -= factor * augmented[col][c];
+      }
+    }
+  }
+
+  return augmented.map((row) =>
+    row.slice(size).map((value) => normalizeNearZero(value))
+  );
+}
+
+type IterativeConvergenceInfo = {
+  spectralRadius: number | null;
+  convergenceGuaranteed: boolean | null;
+  convergenceMessage?: string;
+};
+
+function buildIterationMatrix(
+  method: IterativeMethod,
+  matrixA: number[][],
+  omega: number
+): { matrix: number[][] | null; message?: string } {
+  if (method === "conjugateGradient") {
+    return {
+      matrix: null,
+      message:
+        "共轭梯度法没有固定迭代矩阵 B，rho(B) 判据不适用。",
+    };
+  }
+
+  const size = matrixA.length;
+  const d = zeroNumericMatrix(size, size);
+  const l = zeroNumericMatrix(size, size);
+  const u = zeroNumericMatrix(size, size);
+
+  for (let r = 0; r < size; r += 1) {
+    for (let c = 0; c < size; c += 1) {
+      if (r === c) {
+        d[r][c] = matrixA[r][c];
+      } else if (r > c) {
+        l[r][c] = matrixA[r][c];
+      } else {
+        u[r][c] = matrixA[r][c];
+      }
+    }
+  }
+
+  if (method === "jacobi") {
+    const dInv = zeroNumericMatrix(size, size);
+    for (let i = 0; i < size; i += 1) {
+      if (Math.abs(d[i][i]) < EPS) {
+        return {
+          matrix: null,
+          message: `对角元 a(${i + 1},${i + 1}) 为 0，无法构造 Jacobi 迭代矩阵 B。`,
+        };
+      }
+      dInv[i][i] = 1 / d[i][i];
+    }
+
+    const lPlusU = addNumericMatrices(l, u);
+    if (!lPlusU) return { matrix: null, message: "无法构造 Jacobi 迭代矩阵 B。" };
+
+    const product = multiplyNumericMatrices(dInv, lPlusU);
+    if (!product) return { matrix: null, message: "无法构造 Jacobi 迭代矩阵 B。" };
+
+    return { matrix: scaleNumericMatrix(product, -1) };
+  }
+
+  if (method === "gaussSeidel") {
+    const dPlusL = addNumericMatrices(d, l);
+    if (!dPlusL) return { matrix: null, message: "无法构造 Gauss-Seidel 迭代矩阵 B。" };
+
+    const leftInverse = invertNumericMatrix(dPlusL);
+    if (!leftInverse) {
+      return {
+        matrix: null,
+        message: "矩阵 (D + L) 奇异，无法构造 Gauss-Seidel 迭代矩阵 B。",
+      };
+    }
+
+    const product = multiplyNumericMatrices(leftInverse, u);
+    if (!product) return { matrix: null, message: "无法构造 Gauss-Seidel 迭代矩阵 B。" };
+
+    return { matrix: scaleNumericMatrix(product, -1) };
+  }
+
+  const dPlusOmegaL = addNumericMatrices(d, scaleNumericMatrix(l, omega));
+  if (!dPlusOmegaL) return { matrix: null, message: "无法构造 SOR 迭代矩阵 B。" };
+
+  const leftInverse = invertNumericMatrix(dPlusOmegaL);
+  if (!leftInverse) {
+    return {
+      matrix: null,
+      message: "矩阵 (D + omega*L) 奇异，无法构造 SOR 迭代矩阵 B。",
+    };
+  }
+
+  const right = addNumericMatrices(
+    scaleNumericMatrix(u, omega),
+    scaleNumericMatrix(d, omega - 1)
+  );
+  if (!right) return { matrix: null, message: "无法构造 SOR 迭代矩阵 B。" };
+
+  const product = multiplyNumericMatrices(leftInverse, right);
+  if (!product) return { matrix: null, message: "无法构造 SOR 迭代矩阵 B。" };
+
+  return { matrix: scaleNumericMatrix(product, -1) };
+}
+
+function spectralRadiusFromMatrix(matrix: number[][]): number | null {
+  const eigen = eigsWithMathjs(matrix);
+  if (!eigen || !eigen.values.length) return null;
+
+  let maxMagnitude = 0;
+  for (const value of eigen.values) {
+    maxMagnitude = Math.max(maxMagnitude, componentMagnitude(value));
+  }
+
+  if (!Number.isFinite(maxMagnitude)) return null;
+  return normalizeNearZero(maxMagnitude);
+}
+
+function evaluateIterativeConvergence(
+  method: IterativeMethod,
+  matrixA: number[][],
+  omega: number
+): IterativeConvergenceInfo {
+  const built = buildIterationMatrix(method, matrixA, omega);
+  if (!built.matrix) {
+    return {
+      spectralRadius: null,
+      convergenceGuaranteed: null,
+      convergenceMessage: built.message ?? "由于无法构造 B，暂无法判定是否保证收敛。",
+    };
+  }
+
+  const spectralRadius = spectralRadiusFromMatrix(built.matrix);
+  if (spectralRadius === null) {
+    return {
+      spectralRadius: null,
+      convergenceGuaranteed: null,
+      convergenceMessage: "无法计算 rho(B)，暂无法给出保证收敛判定。",
+    };
+  }
+
+  const convergenceGuaranteed = spectralRadius < 1;
+  return {
+    spectralRadius,
+    convergenceGuaranteed,
+    convergenceMessage: convergenceGuaranteed
+      ? `rho(B)=${formatNumberPrecise(spectralRadius)} < 1，保证收敛。`
+      : `rho(B)=${formatNumberPrecise(spectralRadius)} >= 1，不保证收敛。`,
+  };
+}
 function iterativeHistoryEntry(iteration: number, vector: number[], residual: number): {
   iteration: number;
   vector: string[];
@@ -1578,6 +1784,8 @@ export function solveLinearSystemIterative(options: {
   const omega =
     Number.isFinite(omegaCandidate) && omegaCandidate > 0 ? omegaCandidate : 1.1;
 
+  const convergenceInfo = evaluateIterativeConvergence(method, matrixA, omega);
+
   const defaultGuess = Array.from({ length: rows }, () => 0);
   const initialGuess =
     options.initialGuess && options.initialGuess.length === rows
@@ -1594,8 +1802,11 @@ export function solveLinearSystemIterative(options: {
         converged: false,
         iterations: 0,
         residual: Number.POSITIVE_INFINITY,
+        spectralRadius: convergenceInfo.spectralRadius,
+        convergenceGuaranteed: convergenceInfo.convergenceGuaranteed,
         solution: initialGuess.map((value) => formatNumberPrecise(value)),
         history: [iterativeHistoryEntry(0, initialGuess, Number.POSITIVE_INFINITY)],
+        convergenceMessage: convergenceInfo.convergenceMessage,
         note: "Conjugate Gradient 要求矩阵为对称正定（SPD），当前矩阵不是对称矩阵。",
       };
     }
@@ -1606,8 +1817,11 @@ export function solveLinearSystemIterative(options: {
         converged: false,
         iterations: 0,
         residual: Number.POSITIVE_INFINITY,
+        spectralRadius: convergenceInfo.spectralRadius,
+        convergenceGuaranteed: convergenceInfo.convergenceGuaranteed,
         solution: initialGuess.map((value) => formatNumberPrecise(value)),
         history: [iterativeHistoryEntry(0, initialGuess, Number.POSITIVE_INFINITY)],
+        convergenceMessage: convergenceInfo.convergenceMessage,
         note: "Conjugate Gradient 要求矩阵为对称正定（SPD），当前矩阵未通过正定性检查。",
       };
     }
@@ -1673,9 +1887,12 @@ export function solveLinearSystemIterative(options: {
       converged,
       iterations,
       residual,
+      spectralRadius: convergenceInfo.spectralRadius,
+      convergenceGuaranteed: convergenceInfo.convergenceGuaranteed,
       solution: current.map((value) => formatNumberPrecise(value)),
       history,
       note: notes.length ? notes.join(" ") : undefined,
+      convergenceMessage: convergenceInfo.convergenceMessage,
     };
   }
 
@@ -1686,8 +1903,11 @@ export function solveLinearSystemIterative(options: {
         converged: false,
         iterations: 0,
         residual: Number.POSITIVE_INFINITY,
+        spectralRadius: convergenceInfo.spectralRadius,
+        convergenceGuaranteed: convergenceInfo.convergenceGuaranteed,
         solution: initialGuess.map((value) => formatNumberPrecise(value)),
         history: [iterativeHistoryEntry(0, initialGuess, Number.POSITIVE_INFINITY)],
+        convergenceMessage: convergenceInfo.convergenceMessage,
         note: `主对角线存在 0（第 ${i + 1} 行），当前迭代法不可用。`,
       };
     }
@@ -1763,9 +1983,12 @@ export function solveLinearSystemIterative(options: {
     converged,
     iterations,
     residual,
+    spectralRadius: convergenceInfo.spectralRadius,
+    convergenceGuaranteed: convergenceInfo.convergenceGuaranteed,
     solution: current.map((value) => formatNumberPrecise(value)),
     history,
     note: notes.length ? notes.join(" ") : undefined,
+    convergenceMessage: convergenceInfo.convergenceMessage,
   };
 }
 

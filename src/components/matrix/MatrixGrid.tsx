@@ -9,6 +9,7 @@ type MatrixGridProps = {
   inputMatrix?: string[][];
   onChange?: (row: number, col: number, value: string) => void;
   onPasteMatrix?: (row: number, col: number, text: string) => void;
+  onCellFocus?: (row: number, col: number) => void;
   pivot?: { row: number; col: number };
   highlightRows?: number[];
   className?: string;
@@ -22,6 +23,7 @@ export function MatrixGrid({
   inputMatrix,
   onChange,
   onPasteMatrix,
+  onCellFocus,
   pivot,
   highlightRows = [],
   className = "",
@@ -64,6 +66,7 @@ export function MatrixGrid({
                     key={`${r}-${c}`}
                     value={inputMatrix?.[r]?.[c] ?? "0"}
                     onChange={(event) => onChange?.(r, c, event.target.value)}
+                    onFocus={() => onCellFocus?.(r, c)}
                     onPaste={(event) => {
                       if (!onPasteMatrix) return;
                       event.preventDefault();

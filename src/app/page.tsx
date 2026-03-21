@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   Braces,
@@ -7,11 +7,13 @@ import {
   Sigma,
   SplitSquareVertical,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { MatrixGrid } from "@/components/matrix/MatrixGrid";
+import { MatrixShelf } from "@/components/matrix/MatrixShelf";
 import { OperationButtonGroup } from "@/components/matrix/OperationButtonGroup";
 import { ResultStateCard } from "@/components/matrix/ResultStateCard";
+import { SaveToLibraryButton } from "@/components/matrix/SaveToLibraryButton";
 import { StepCard } from "@/components/matrix/StepCard";
 import { useMatrix } from "@/hooks/useMatrix";
 import {
@@ -39,6 +41,12 @@ import type {
   QRResult,
   ResultTone,
 } from "@/types/matrix";
+import {
+  type ActiveContext,
+  type MatrixKind,
+  suggestNameForContext,
+  useMatrixLibraryStore,
+} from "@/store/matrix-library";
 
 type TabId = "operations" | "system" | "determinant" | "decomposition" | "eigen";
 type DecompositionMode = "lu" | "qr" | "cholesky";
@@ -46,14 +54,6 @@ type DecompositionMode = "lu" | "qr" | "cholesky";
 type Feedback = {
   tone: ResultTone;
   text: string;
-};
-
-type MatrixLibraryItem = {
-  id: string;
-  name: string;
-  matrix: string[][];
-  source: string;
-  updatedAt: number;
 };
 
 type DecompositionResult =
@@ -81,18 +81,17 @@ type DecompositionResult =
     };
 
 const RESIDUAL_THRESHOLD = 1e-10;
-const MATRIX_LIBRARY_KEY = "linear-algebra-studio.matrix-library";
 
 const OPERATION_OPTIONS = [
   { id: "add", label: "A + B" },
   { id: "subtract", label: "A - B" },
-  { id: "multiply", label: "A · B" },
-  { id: "inverse", label: "A⁻¹" },
+  { id: "multiply", label: "A * B" },
+  { id: "inverse", label: "A^-1" },
   { id: "rank", label: "rank(A)" },
-  { id: "transpose", label: "Transpose" },
+  { id: "transpose", label: "转置" },
   { id: "simplify", label: "RREF" },
-  { id: "scalar", label: "Scalar" },
-  { id: "square", label: "A²" },
+  { id: "scalar", label: "数乘" },
+  { id: "square", label: "A^2" },
 ] as const;
 
 const DEFAULT_SQUARE = toInputMatrix([
@@ -102,18 +101,18 @@ const DEFAULT_SQUARE = toInputMatrix([
 ]);
 
 const DECOMPOSITION_OPTIONS: Array<{ id: DecompositionMode; label: string }> = [
-  { id: "lu", label: "LU (pivoting)" },
-  { id: "qr", label: "QR (Householder)" },
-  { id: "cholesky", label: "Cholesky" },
+  { id: "lu", label: "LU（带主元）" },
+  { id: "qr", label: "QR（Householder）" },
+  { id: "cholesky", label: "Cholesky分解" },
 ];
 
 const SYSTEM_METHOD_OPTIONS: Array<{ id: LinearSystemMethod; label: string }> = [
-  { id: "gaussianElimination", label: "Gaussian Elimination" },
-  { id: "gaussJordan", label: "Gauss-Jordan" },
-  { id: "jacobi", label: "Jacobi Iteration" },
-  { id: "gaussSeidel", label: "Gauss-Seidel Iteration" },
-  { id: "sor", label: "SOR Iteration" },
-  { id: "conjugateGradient", label: "Conjugate Gradient" },
+  { id: "gaussianElimination", label: "高斯消元" },
+  { id: "gaussJordan", label: "高斯-约旦" },
+  { id: "jacobi", label: "Jacobi迭代" },
+  { id: "gaussSeidel", label: "Gauss-Seidel迭代" },
+  { id: "sor", label: "SOR迭代" },
+  { id: "conjugateGradient", label: "共轭梯度法" },
 ];
 
 function isIterativeSystemMethod(method: LinearSystemMethod): boolean {
@@ -130,38 +129,13 @@ function formatResidual(value: number): string {
   return value.toExponential(3);
 }
 
+function formatSpectralRadius(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "N/A";
+  return value.toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
+
 function cloneMatrixValues(matrix: string[][]): string[][] {
   return matrix.map((row) => row.map((value) => value || "0"));
-}
-
-function suggestNextMatrixName(library: MatrixLibraryItem[]): string {
-  const used = new Set(library.map((item) => item.name.toUpperCase()));
-  for (let i = 0; i < 26; i += 1) {
-    const candidate = String.fromCharCode(65 + i);
-    if (!used.has(candidate)) return candidate;
-  }
-  return `M${library.length + 1}`;
-}
-
-function loadMatrixLibraryFromStorage(): MatrixLibraryItem[] {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const raw = window.localStorage.getItem(MATRIX_LIBRARY_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw) as MatrixLibraryItem[];
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((item) => Array.isArray(item.matrix) && item.matrix.length > 0)
-      .map((item) => ({
-        ...item,
-        matrix: cloneMatrixValues(item.matrix),
-      }));
-  } catch {
-    return [];
-  }
 }
 
 function DisplayModeSwitcher({
@@ -174,16 +148,20 @@ function DisplayModeSwitcher({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        Display Mode
+        显示模式
       </div>
       <div className="flex flex-wrap gap-2">
-        {["decimal", "fraction", "symbolic"].map((mode) => (
+        {[
+          { value: "decimal", label: "小数" },
+          { value: "fraction", label: "分数" },
+          { value: "symbolic", label: "符号" },
+        ].map((mode) => (
           <button
-            key={mode}
-            onClick={() => onChange(mode as DisplayMode)}
-            className={`mode-chip ${displayMode === mode ? "mode-chip-active" : ""}`}
+            key={mode.value}
+            onClick={() => onChange(mode.value as DisplayMode)}
+            className={`mode-chip ${displayMode === mode.value ? "mode-chip-active" : ""}`}
           >
-            {mode}
+            {mode.label}
           </button>
         ))}
       </div>
@@ -218,12 +196,15 @@ export default function Home() {
   const [eigResult, setEigResult] = useState<EigenAnalysisResult | null>(null);
   const [eigFeedback, setEigFeedback] = useState<Feedback | null>(null);
 
-  const [matrixLibrary, setMatrixLibrary] = useState<MatrixLibraryItem[]>(
-    () => loadMatrixLibraryFromStorage()
+  const matrixInventory = useMatrixLibraryStore((state) => state.matrixInventory);
+  const activeMatrixId = useMatrixLibraryStore((state) => state.activeMatrixId);
+  const renameInventoryMatrix = useMatrixLibraryStore((state) => state.renameMatrix);
+  const deleteInventoryMatrix = useMatrixLibraryStore((state) => state.deleteMatrix);
+  const setInventoryActiveMatrix = useMatrixLibraryStore((state) => state.setActiveMatrix);
+  const saveCurrentResultToLibrary = useMatrixLibraryStore(
+    (state) => state.saveCurrentResultToLibrary
   );
-  const [libraryName, setLibraryName] = useState(
-    () => suggestNextMatrixName(loadMatrixLibraryFromStorage())
-  );
+  const [activeOperationTarget, setActiveOperationTarget] = useState<"A" | "B">("A");
 
   const tabs = useMemo(
     () => [
@@ -240,18 +221,18 @@ export default function Home() {
     const normalized = normalizeMatrixInput(detMatrix);
     if (normalized.length !== normalized[0].length) {
       setDetResult(null);
-      setDetFeedback({ tone: "error", text: "determinant requires a square matrix" });
+      setDetFeedback({ tone: "error", text: "行列式计算要求方阵" });
       return;
     }
     setDetResult(determinant(normalized));
-    setDetFeedback({ tone: "success", text: "det(A) computed" });
+    setDetFeedback({ tone: "success", text: "det(A) 计算完成" });
   };
 
   const computeDecomposition = () => {
     const normalized = normalizeMatrixInput(decompMatrix);
     if (decompMode !== "qr" && decompRows !== decompCols) {
       setDecompResult(null);
-      setDecompFeedback({ tone: "error", text: "LU/Cholesky require a square matrix" });
+      setDecompFeedback({ tone: "error", text: "LU/Cholesky 需要方阵" });
       return;
     }
 
@@ -259,13 +240,13 @@ export default function Home() {
       const decomposition = luDecomposition(normalized);
       if (!decomposition) {
         setDecompResult(null);
-        setDecompFeedback({ tone: "error", text: "LU failed" });
+        setDecompFeedback({ tone: "error", text: "LU 分解失败" });
         return;
       }
       const residual = luResidual(normalized, decomposition);
       const passed = residual === null ? null : residual < RESIDUAL_THRESHOLD;
       setDecompResult({ mode: "lu", decomposition, residual, threshold: RESIDUAL_THRESHOLD, passed });
-      setDecompFeedback({ tone: passed === false ? "warning" : "success", text: "LU computed" });
+      setDecompFeedback({ tone: passed === false ? "warning" : "success", text: "LU 分解完成" });
       return;
     }
 
@@ -273,7 +254,7 @@ export default function Home() {
       const decomposition = qrDecomposition(normalized);
       if (!decomposition) {
         setDecompResult(null);
-        setDecompFeedback({ tone: "error", text: "QR requires numeric input" });
+        setDecompFeedback({ tone: "error", text: "QR 需要纯数值输入" });
         return;
       }
       const residual = qrResidual(normalized, decomposition);
@@ -291,20 +272,20 @@ export default function Home() {
         threshold: RESIDUAL_THRESHOLD,
         passed,
       });
-      setDecompFeedback({ tone: passed ? "success" : "warning", text: "QR computed" });
+      setDecompFeedback({ tone: passed ? "success" : "warning", text: "QR 分解完成" });
       return;
     }
 
     const decomposition = choleskyDecomposition(normalized);
     if (!decomposition) {
       setDecompResult(null);
-      setDecompFeedback({ tone: "error", text: "Cholesky requires SPD matrix" });
+      setDecompFeedback({ tone: "error", text: "Cholesky 需要对称正定矩阵" });
       return;
     }
     const residual = choleskyResidual(normalized, decomposition);
     const passed = residual !== null && residual < RESIDUAL_THRESHOLD;
     setDecompResult({ mode: "cholesky", decomposition, residual, threshold: RESIDUAL_THRESHOLD, passed });
-    setDecompFeedback({ tone: passed ? "success" : "warning", text: "Cholesky computed" });
+    setDecompFeedback({ tone: passed ? "success" : "warning", text: "Cholesky 分解完成" });
   };
 
   const computeEigen = () => {
@@ -312,127 +293,80 @@ export default function Home() {
     const numeric = toNumericMatrix(normalized);
     if (!numeric) {
       setEigResult(null);
-      setEigFeedback({ tone: "error", text: "Eigen requires numeric input" });
+      setEigFeedback({ tone: "error", text: "特征分析需要纯数值输入" });
       return;
     }
     const result = eigsWithMathjs(numeric);
     if (!result) {
       setEigResult(null);
-      setEigFeedback({ tone: "error", text: "Eigen solve failed" });
+      setEigFeedback({ tone: "error", text: "特征分析计算失败" });
       return;
     }
     setEigResult(result);
     if (!result.diagonalizable) {
-      setEigFeedback({ tone: "warning", text: "Matrix is not diagonalizable" });
+      setEigFeedback({ tone: "warning", text: "该矩阵不可对角化" });
       return;
     }
-    setEigFeedback({ tone: "success", text: "Eigen computed" });
+    setEigFeedback({ tone: "success", text: "特征分析完成" });
   };
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(MATRIX_LIBRARY_KEY, JSON.stringify(matrixLibrary));
-    } catch {
-      // ignore storage failure
-    }
-  }, [matrixLibrary]);
+  const activeLibraryContext = useMemo<ActiveContext>(() => {
+    if (activeTab === "operations") return "matrix-operations";
+    if (activeTab === "system") return "linear-system";
+    if (activeTab === "determinant") return "determinant";
+    if (activeTab === "decomposition") return "decomposition";
+    return "eigen";
+  }, [activeTab]);
 
-  const saveMatrixToLibrary = (
-    rawMatrix: string[][] | null,
-    preferredName?: string,
-    source = "manual"
-  ) => {
-    if (!rawMatrix || rawMatrix.length === 0 || !rawMatrix[0]?.length) return;
-
-    const matrixSnapshot = cloneMatrixValues(rawMatrix);
-    const baseName = (preferredName ?? "").trim();
-    let nextSuggested = "A";
-
-    setMatrixLibrary((prev) => {
-      const fallbackName = suggestNextMatrixName(prev);
-      const finalName = baseName || fallbackName;
-      const now = Date.now();
-      const existingIndex = prev.findIndex(
-        (item) => item.name.toUpperCase() === finalName.toUpperCase()
-      );
-
-      let next: MatrixLibraryItem[];
-      if (existingIndex >= 0) {
-        next = prev.slice();
-        next[existingIndex] = {
-          ...next[existingIndex],
-          name: finalName,
-          matrix: matrixSnapshot,
-          source,
-          updatedAt: now,
-        };
-      } else {
-        next = [
-          {
-            id: `mat-${now}-${Math.random().toString(16).slice(2, 8)}`,
-            name: finalName,
-            matrix: matrixSnapshot,
-            source,
-            updatedAt: now,
-          },
-          ...prev,
-        ];
-      }
-
-      nextSuggested = suggestNextMatrixName(next);
-      return next;
-    });
-
-    setLibraryName(nextSuggested);
-  };
-
-  const deleteLibraryMatrix = (id: string) => {
-    let nextSuggested = "A";
-    setMatrixLibrary((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      nextSuggested = suggestNextMatrixName(next);
-      return next;
-    });
-    setLibraryName(nextSuggested);
-  };
+  const inferMatrixKindByContext = (context: ActiveContext): MatrixKind =>
+    context === "linear-system" ? "augmented" : "standard";
 
   const loadMatrixToOperationsA = (matrixData: string[][]) => {
     matrix.operations.setMatrixA(cloneMatrixValues(matrixData));
+    setActiveOperationTarget("A");
   };
 
   const loadMatrixToOperationsB = (matrixData: string[][]) => {
     matrix.operations.setMatrixB(cloneMatrixValues(matrixData));
+    setActiveOperationTarget("B");
   };
 
-  const loadMatrixToActiveTab = (matrixData: string[][]) => {
+  const loadMatrixToContext = (
+    matrixData: string[][],
+    context: ActiveContext = activeLibraryContext
+  ) => {
     const copied = cloneMatrixValues(matrixData);
 
-    if (activeTab === "operations") {
+    if (context === "matrix-operations") {
+      if (activeOperationTarget === "B") {
+        loadMatrixToOperationsB(copied);
+        return;
+      }
       loadMatrixToOperationsA(copied);
       return;
     }
 
-    if (activeTab === "system") {
+    if (context === "linear-system") {
       if ((copied[0]?.length ?? 0) < 2) return;
       matrix.system.setAugmentedMatrix(copied);
       return;
     }
 
-    if (activeTab === "determinant") {
+    if (context === "determinant") {
       const size = Math.max(copied.length, copied[0]?.length ?? 1);
       setDetSize(size);
       setDetMatrix(resizeInputMatrix(copied, size, size, "0"));
       return;
     }
 
-    if (activeTab === "eigen") {
+    if (context === "eigen") {
       const size = Math.max(copied.length, copied[0]?.length ?? 1);
       setEigSize(size);
       setEigMatrix(resizeInputMatrix(copied, size, size, "0"));
       return;
     }
 
-    if (activeTab === "decomposition") {
-      if (decompMode === "qr") {
+    if (context === "decomposition") {
+      if (decompMode === "qr" || copied.length !== copied[0]?.length) {
         const rows = Math.max(1, copied.length);
         const cols = Math.max(1, copied[0]?.length ?? 1);
         setDecompRows(rows);
@@ -448,23 +382,49 @@ export default function Home() {
     }
   };
 
-  const activeEditingMatrix = useMemo(() => {
-    if (activeTab === "operations") return matrix.operations.matrixA;
-    if (activeTab === "system") return matrix.system.augmented;
-    if (activeTab === "determinant") return detMatrix;
-    if (activeTab === "decomposition") return decompMatrix;
-    return eigMatrix;
-  }, [
-    activeTab,
-    matrix.operations.matrixA,
-    matrix.system.augmented,
-    detMatrix,
-    decompMatrix,
-    eigMatrix,
-  ]);
+  const saveMatrixWithName = (
+    rawMatrix: string[][] | null,
+    preferredName: string,
+    context: ActiveContext,
+    type?: MatrixKind
+  ) => {
+    saveCurrentResultToLibrary(
+      rawMatrix,
+      context,
+      type ?? inferMatrixKindByContext(context),
+      preferredName
+    );
+  };
 
-  const saveActiveMatrixToLibrary = () => {
-    saveMatrixToLibrary(activeEditingMatrix, libraryName, `input-${activeTab}`);
+  const handleActivateInventoryMatrix = (item: {
+    id: string;
+    data: string[][];
+    type: MatrixKind;
+  }) => {
+    setInventoryActiveMatrix(item.id, activeLibraryContext);
+    loadMatrixToContext(item.data, activeLibraryContext);
+  };
+
+  const handleSaveCurrentInputToLibrary = (name: string) => {
+    const activeEditingMatrix =
+      activeLibraryContext === "matrix-operations"
+        ? activeOperationTarget === "B"
+          ? matrix.operations.matrixB
+          : matrix.operations.matrixA
+        : activeLibraryContext === "linear-system"
+          ? matrix.system.augmented
+          : activeLibraryContext === "determinant"
+            ? detMatrix
+            : activeLibraryContext === "decomposition"
+              ? decompMatrix
+              : eigMatrix;
+
+    saveMatrixWithName(
+      activeEditingMatrix,
+      name,
+      activeLibraryContext,
+      inferMatrixKindByContext(activeLibraryContext)
+    );
   };
 
   const pasteDeterminantMatrix = (row: number, col: number, text: string) => {
@@ -482,36 +442,44 @@ export default function Home() {
   const decompEvidence = useMemo(() => {
     if (!decompResult) return undefined;
     if (decompResult.mode === "lu") {
-      return `P·A = L·U, maxAbs(PA-LU)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
+      return `P*A = L*U, maxAbs(PA-LU)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
     }
     if (decompResult.mode === "qr") {
       return `A=QR, maxAbs(A-QR)=${decompResult.residual?.toExponential(3) ?? "N/A"}, maxAbs(Q^TQ-I)=${decompResult.orthResidual?.toExponential(3) ?? "N/A"}`;
     }
-    return `A=L·L^T, maxAbs(A-LL^T)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
+    return `A=L*L^T, maxAbs(A-LL^T)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
   }, [decompResult]);
 
   const systemUsesIteration = isIterativeSystemMethod(matrix.system.method);
   const systemEvidence = matrix.system.iterativeResult
-    ? `residual=${formatResidual(matrix.system.iterativeResult.residual)}, iterations=${matrix.system.iterativeResult.iterations}`
+    ? `残差=${formatResidual(matrix.system.iterativeResult.residual)}，迭代次数=${matrix.system.iterativeResult.iterations}，ρ(B)=${formatSpectralRadius(matrix.system.iterativeResult.spectralRadius)}，判定=${matrix.system.iterativeResult.convergenceGuaranteed === true ? "ρ(B)<1，保证收敛" : matrix.system.iterativeResult.convergenceGuaranteed === false ? "ρ(B)≥1，不保证收敛" : "不适用/无法判定"}`
     : undefined;
+  const systemResultMatrix =
+    matrix.system.currentStep?.matrix ?? matrix.system.augmented;
+  const decompPrimaryMatrix = useMemo(() => {
+    if (!decompResult) return null;
+    if (decompResult.mode === "lu") return decompResult.decomposition.L;
+    if (decompResult.mode === "qr") return decompResult.decomposition.Q;
+    return decompResult.decomposition.L;
+  }, [decompResult]);
 
   return (
     <div className="min-h-screen px-6 py-10 text-[15px] text-slate-900">
       <header className="mx-auto w-full max-w-6xl space-y-4">
         <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
-          Linear Algebra Studio
+          线性代数工作室
         </div>
         <h1 className="text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
-          Linear Algebra Workbench
+          线性代数工作台
         </h1>
         <p className="max-w-3xl text-base text-slate-700">
-          Matrix operations, linear systems, decomposition, and eigen analysis with correctness checks.
+          支持矩阵运算、线性方程组、矩阵分解与特征分析，并提供正确性校验。
         </p>
       </header>
 
       <div className="mx-auto mt-8 grid w-full max-w-6xl gap-6 lg:grid-cols-[240px_1fr]">
         <aside className="studio-card h-fit space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Navigation</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">导航</div>
           <div className="grid gap-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -530,85 +498,28 @@ export default function Home() {
           <DisplayModeSwitcher displayMode={matrix.displayMode} onChange={matrix.setDisplayMode} />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Matrix Library
-            </div>
-
-            <div className="space-y-2">
-              <input
-                value={libraryName}
-                onChange={(event) => setLibraryName(event.target.value)}
-                className="studio-input"
-                placeholder="Matrix name (A/B/C...)"
-              />
-              <div className="flex gap-2">
-                <button onClick={saveActiveMatrixToLibrary} className="step-control text-xs">
-                  保存当前输入
-                </button>
-                {activeTab === "operations" && matrix.operations.resultMatrix ? (
-                  <button
-                    onClick={() =>
-                      saveMatrixToLibrary(
-                        matrix.operations.resultMatrix,
-                        `${libraryName || "R"}_res`,
-                        "operations-result"
-                      )
-                    }
-                    className="step-control text-xs"
-                  >
-                    保存结果
-                  </button>
-                ) : null}
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                当前输入
               </div>
+              <SaveToLibraryButton
+                defaultName={suggestNameForContext(matrixInventory, activeLibraryContext)}
+                onSave={handleSaveCurrentInputToLibrary}
+              />
             </div>
-
-            <div className="mt-3 max-h-64 space-y-2 overflow-auto pr-1">
-              {matrixLibrary.length === 0 ? (
-                <div className="text-xs text-slate-500">暂无已保存矩阵</div>
-              ) : (
-                matrixLibrary.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="font-mono text-xs font-semibold text-slate-800">{item.name}</div>
-                      <div className="text-[10px] text-slate-500">
-                        {item.matrix.length}×{item.matrix[0]?.length ?? 0}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      <button
-                        onClick={() => loadMatrixToActiveTab(item.matrix)}
-                        className="step-control px-2 py-1 text-[11px]"
-                      >
-                        载入当前模式
-                      </button>
-                      {activeTab === "operations" ? (
-                        <>
-                          <button
-                            onClick={() => loadMatrixToOperationsA(item.matrix)}
-                            className="step-control px-2 py-1 text-[11px]"
-                          >
-                            载入 A
-                          </button>
-                          <button
-                            onClick={() => loadMatrixToOperationsB(item.matrix)}
-                            className="step-control px-2 py-1 text-[11px]"
-                          >
-                            载入 B
-                          </button>
-                        </>
-                      ) : null}
-                      <button
-                        onClick={() => deleteLibraryMatrix(item.id)}
-                        className="step-control px-2 py-1 text-[11px]"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="mt-2 text-[11px] text-slate-500">
+              {activeLibraryContext === "matrix-operations"
+                ? `当前活动输入位：${activeOperationTarget}`
+                : "可将当前编辑矩阵保存到矩阵库。"}
             </div>
           </div>
+          <MatrixShelf
+            items={matrixInventory}
+            activeMatrixId={activeMatrixId}
+            onActivate={handleActivateInventoryMatrix}
+            onDelete={deleteInventoryMatrix}
+            onRename={renameInventoryMatrix}
+          />
         </aside>
 
         <div>
@@ -618,10 +529,10 @@ export default function Home() {
                 <section className="space-y-6">
                   <div className="studio-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-slate-900">Matrix Input</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">矩阵输入</h2>
                       <div className="flex flex-wrap items-center gap-3 text-sm">
                         <label className="flex items-center gap-2">
-                          Rows
+                          行数
                           <select
                             value={matrix.operations.rows}
                             onChange={(event) => matrix.operations.setDimensions(Number(event.target.value), matrix.operations.cols)}
@@ -633,7 +544,7 @@ export default function Home() {
                           </select>
                         </label>
                         <label className="flex items-center gap-2">
-                          Cols
+                          列数
                           <select
                             value={matrix.operations.cols}
                             onChange={(event) => matrix.operations.setDimensions(matrix.operations.rows, Number(event.target.value))}
@@ -654,15 +565,16 @@ export default function Home() {
                       displayMode={matrix.displayMode}
                       onChange={matrix.operations.setCellA}
                       onPasteMatrix={matrix.operations.pasteA}
+                      onCellFocus={() => setActiveOperationTarget("A")}
                     />
 
                     {(matrix.operations.operation === "add" || matrix.operations.operation === "subtract" || matrix.operations.operation === "multiply") && (
                       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                          <div className="font-semibold text-slate-700">Matrix B</div>
+                          <div className="font-semibold text-slate-700">矩阵 B</div>
                           {matrix.operations.operation === "multiply" ? (
                             <div className="flex flex-wrap items-center gap-2">
-                              <label className="flex items-center gap-1">Rows
+                              <label className="flex items-center gap-1">行数
                                 <select
                                   value={matrix.operations.bRows}
                                   onChange={(event) => matrix.operations.setBMatrixDimensions(Number(event.target.value), matrix.operations.bCols)}
@@ -673,7 +585,7 @@ export default function Home() {
                                   ))}
                                 </select>
                               </label>
-                              <label className="flex items-center gap-1">Cols
+                              <label className="flex items-center gap-1">列数
                                 <select
                                   value={matrix.operations.bCols}
                                   onChange={(event) => matrix.operations.setBMatrixDimensions(matrix.operations.bRows, Number(event.target.value))}
@@ -695,6 +607,7 @@ export default function Home() {
                           displayMode={matrix.displayMode}
                           onChange={matrix.operations.setCellB}
                           onPasteMatrix={matrix.operations.pasteB}
+                          onCellFocus={() => setActiveOperationTarget("B")}
                         />
                       </div>
                     )}
@@ -702,8 +615,8 @@ export default function Home() {
 
                   <div className="studio-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-slate-900">Operation</h2>
-                      <button onClick={matrix.operations.compute} className="studio-primary-btn">Compute</button>
+                      <h2 className="text-lg font-semibold text-slate-900">运算</h2>
+                      <button onClick={matrix.operations.compute} className="studio-primary-btn">计算</button>
                     </div>
 
                     <OperationButtonGroup
@@ -717,7 +630,7 @@ export default function Home() {
                         value={matrix.operations.scalar}
                         onChange={(event) => matrix.operations.setScalar(event.target.value)}
                         className="studio-input"
-                        placeholder="Scalar e.g. 1/3"
+                        placeholder="数乘系数，例如 1/3"
                       />
                     )}
                   </div>
@@ -725,28 +638,33 @@ export default function Home() {
 
                 <aside className="space-y-6">
                   <div className="studio-card space-y-4">
-                    <h2 className="text-lg font-semibold text-slate-900">Result</h2>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-slate-900">结果</h2>
+                      <SaveToLibraryButton
+                        disabled={!matrix.operations.resultMatrix}
+                        defaultName={suggestNameForContext(
+                          matrixInventory,
+                          "matrix-operations"
+                        )}
+                        onSave={(name) =>
+                          saveMatrixWithName(
+                            matrix.operations.resultMatrix,
+                            name,
+                            "matrix-operations",
+                            "standard"
+                          )
+                        }
+                      />
+                    </div>
                     {matrix.operations.feedback ? (
-                      <ResultStateCard tone={matrix.operations.feedback.tone} title="Operation Status" message={matrix.operations.feedback.text} />
+                      <ResultStateCard tone={matrix.operations.feedback.tone} title="运算状态" message={matrix.operations.feedback.text} />
                     ) : (
-                      <div className="text-sm text-slate-500">Choose operation and compute.</div>
+                      <div className="text-sm text-slate-500">请选择运算并点击计算。</div>
                     )}
                     {matrix.operations.resultMatrix ? (
                       <>
                         <MatrixGrid matrix={matrix.operations.resultMatrix} displayMode={matrix.displayMode} />
                         <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() =>
-                              saveMatrixToLibrary(
-                                matrix.operations.resultMatrix,
-                                `${libraryName || "R"}_res`,
-                                "operations-result"
-                              )
-                            }
-                            className="step-control"
-                          >
-                            存为新矩阵
-                          </button>
                           <button
                             onClick={() => loadMatrixToOperationsA(matrix.operations.resultMatrix!)}
                             className="step-control"
@@ -774,9 +692,9 @@ export default function Home() {
                 <section className="space-y-6">
                   <div className="studio-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-slate-900">Linear System</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">线性方程组</h2>
                       <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <label className="flex items-center gap-2">Eq
+                        <label className="flex items-center gap-2">方程数
                           <select
                             value={matrix.system.rows}
                             onChange={(event) => matrix.system.setDimensions(Number(event.target.value), matrix.system.cols)}
@@ -787,7 +705,7 @@ export default function Home() {
                             ))}
                           </select>
                         </label>
-                        <label className="flex items-center gap-2">Vars
+                        <label className="flex items-center gap-2">变量数
                           <select
                             value={matrix.system.cols}
                             onChange={(event) => matrix.system.setDimensions(matrix.system.rows, Number(event.target.value))}
@@ -798,7 +716,7 @@ export default function Home() {
                             ))}
                           </select>
                         </label>
-                        <label className="flex items-center gap-2">Method
+                        <label className="flex items-center gap-2">求解方法
                           <select
                             value={matrix.system.method}
                             onChange={(event) => matrix.system.setMethod(event.target.value as LinearSystemMethod)}
@@ -811,7 +729,7 @@ export default function Home() {
                         </label>
                         {systemUsesIteration ? (
                           <>
-                            <label className="flex items-center gap-2">Tol
+                            <label className="flex items-center gap-2">容差
                               <input
                                 value={matrix.system.tolerance}
                                 onChange={(event) => matrix.system.setTolerance(event.target.value)}
@@ -819,7 +737,7 @@ export default function Home() {
                                 placeholder="1e-10"
                               />
                             </label>
-                            <label className="flex items-center gap-2">Iter
+                            <label className="flex items-center gap-2">迭代
                               <input
                                 value={matrix.system.maxIterations}
                                 onChange={(event) => matrix.system.setMaxIterations(event.target.value)}
@@ -828,7 +746,7 @@ export default function Home() {
                               />
                             </label>
                             {matrix.system.method === "sor" ? (
-                              <label className="flex items-center gap-2">Omega
+                              <label className="flex items-center gap-2">松弛因子
                                 <input
                                   value={matrix.system.omega}
                                   onChange={(event) => matrix.system.setOmega(event.target.value)}
@@ -839,7 +757,7 @@ export default function Home() {
                             ) : null}
                           </>
                         ) : null}
-                        <button onClick={matrix.system.compute} className="studio-primary-btn">Solve</button>
+                        <button onClick={matrix.system.compute} className="studio-primary-btn">求解</button>
                       </div>
                     </div>
 
@@ -856,7 +774,7 @@ export default function Home() {
 
                   {systemUsesIteration ? (
                     <div className="studio-card space-y-4">
-                      <h3 className="text-base font-semibold text-slate-900">Iterative Progress</h3>
+                      <h3 className="text-base font-semibold text-slate-900">迭代过程</h3>
                       {matrix.system.iterativeResult ? (
                         <>
                           <MatrixGrid
@@ -869,13 +787,13 @@ export default function Home() {
                                 key={`iter-${idx}-${item.iteration}`}
                                 className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700"
                               >
-                                k={item.iteration}, residual={formatResidual(item.residual)}, x=[{item.vector.join(", ")}]
+                                k={item.iteration}，残差={formatResidual(item.residual)}，x=[{item.vector.join(", ")}]
                               </div>
                             ))}
                           </div>
                         </>
                       ) : (
-                        <div className="text-sm text-slate-500">Run solve to inspect iteration history.</div>
+                        <div className="text-sm text-slate-500">执行求解后查看迭代历史。</div>
                       )}
                     </div>
                   ) : (
@@ -883,7 +801,7 @@ export default function Home() {
                       step={matrix.system.currentStep}
                       stepIndex={matrix.system.stepIndex}
                       totalSteps={Math.max(matrix.system.steps.length, 1)}
-                      stepDescription={matrix.system.currentStep ? matrix.describeStep(matrix.system.currentStep) : "Waiting"}
+                      stepDescription={matrix.system.currentStep ? matrix.describeStep(matrix.system.currentStep) : "等待求解"}
                       isPlaying={matrix.system.isPlaying}
                       onPrev={matrix.system.prevStep}
                       onNext={matrix.system.nextStep}
@@ -905,20 +823,34 @@ export default function Home() {
 
                 <aside className="space-y-6">
                   <div className="studio-card space-y-4">
-                    <h2 className="text-lg font-semibold text-slate-900">Summary</h2>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-slate-900">结果摘要</h2>
+                      <SaveToLibraryButton
+                        disabled={!matrix.system.summary}
+                        defaultName={suggestNameForContext(matrixInventory, "linear-system")}
+                        onSave={(name) =>
+                          saveMatrixWithName(
+                            systemResultMatrix,
+                            name,
+                            "linear-system",
+                            "augmented"
+                          )
+                        }
+                      />
+                    </div>
                     {matrix.system.feedback ? (
                       <ResultStateCard
                         tone={matrix.system.feedback.tone}
-                        title="Solve Status"
+                        title="求解状态"
                         message={matrix.system.feedback.text}
                         evidence={systemEvidence}
                       />
                     ) : (
-                      <div className="text-sm text-slate-500">Solve to view summary.</div>
+                      <div className="text-sm text-slate-500">求解后查看结果摘要。</div>
                     )}
                     {matrix.system.summary ? (
                       <div className="space-y-2 text-sm">
-                        <div>Type: {matrix.system.summary.type}</div>
+                        <div>类型：{matrix.system.summary.type}</div>
                         <div>rank(A) = {matrix.system.summary.rankA}</div>
                         <div>rank([A|b]) = {matrix.system.summary.rankAug}</div>
                         {matrix.system.iterativeResult ? (
@@ -932,6 +864,11 @@ export default function Home() {
                         {matrix.system.iterativeResult?.note ? (
                           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                             {matrix.system.iterativeResult.note}
+                          </div>
+                        ) : null}
+                        {matrix.system.iterativeResult?.convergenceMessage ? (
+                          <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                            收敛性判定：{matrix.system.iterativeResult.convergenceMessage}
                           </div>
                         ) : null}
                       </div>
@@ -948,9 +885,9 @@ export default function Home() {
                 <section className="space-y-6">
                   <div className="studio-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-slate-900">Determinant</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">行列式</h2>
                       <div className="flex items-center gap-2 text-sm">
-                        Size
+                        维度
                         <select
                           value={detSize}
                           onChange={(event) => {
@@ -964,7 +901,7 @@ export default function Home() {
                             <option key={`det-${size}`} value={size}>{size}</option>
                           ))}
                         </select>
-                        <button onClick={computeDeterminant} className="studio-primary-btn">Compute</button>
+                        <button onClick={computeDeterminant} className="studio-primary-btn">计算</button>
                       </div>
                     </div>
 
@@ -987,11 +924,20 @@ export default function Home() {
 
                 <aside className="space-y-6">
                   <div className="studio-card space-y-4">
-                    <h2 className="text-lg font-semibold text-slate-900">Result</h2>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-slate-900">结果</h2>
+                      <SaveToLibraryButton
+                        disabled={!detResult}
+                        defaultName={suggestNameForContext(matrixInventory, "determinant")}
+                        onSave={(name) =>
+                          saveMatrixWithName(detMatrix, name, "determinant", "standard")
+                        }
+                      />
+                    </div>
                     {detFeedback ? (
-                      <ResultStateCard tone={detFeedback.tone} title="Determinant Status" message={detFeedback.text} />
+                      <ResultStateCard tone={detFeedback.tone} title="行列式状态" message={detFeedback.text} />
                     ) : (
-                      <div className="text-sm text-slate-500">Input matrix and compute.</div>
+                      <div className="text-sm text-slate-500">输入矩阵后点击计算。</div>
                     )}
                     {detResult ? <div className="text-sm">det(A) = {matrix.formatValue(detResult)}</div> : null}
                   </div>
@@ -1005,9 +951,9 @@ export default function Home() {
                 <section className="space-y-6">
                   <div className="studio-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-slate-900">Decomposition</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">矩阵分解</h2>
                       <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <label className="flex items-center gap-1">Mode
+                        <label className="flex items-center gap-1">模式
                           <select
                             value={decompMode}
                             onChange={(event) => {
@@ -1025,7 +971,7 @@ export default function Home() {
                             ))}
                           </select>
                         </label>
-                        <label className="flex items-center gap-1">Rows
+                        <label className="flex items-center gap-1">行数
                           <select
                             value={decompRows}
                             onChange={(event) => {
@@ -1045,7 +991,7 @@ export default function Home() {
                             ))}
                           </select>
                         </label>
-                        <label className="flex items-center gap-1">Cols
+                        <label className="flex items-center gap-1">列数
                           <select
                             value={decompCols}
                             disabled={decompMode !== "qr"}
@@ -1061,7 +1007,7 @@ export default function Home() {
                             ))}
                           </select>
                         </label>
-                        <button onClick={computeDecomposition} className="studio-primary-btn">Compute</button>
+                        <button onClick={computeDecomposition} className="studio-primary-btn">计算</button>
                       </div>
                     </div>
 
@@ -1084,11 +1030,25 @@ export default function Home() {
 
                 <aside className="space-y-6">
                   <div className="studio-card space-y-4">
-                    <h2 className="text-lg font-semibold text-slate-900">Result</h2>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-slate-900">结果</h2>
+                      <SaveToLibraryButton
+                        disabled={!decompResult || !decompPrimaryMatrix}
+                        defaultName={suggestNameForContext(matrixInventory, "decomposition")}
+                        onSave={(name) =>
+                          saveMatrixWithName(
+                            decompPrimaryMatrix,
+                            name,
+                            "decomposition",
+                            "standard"
+                          )
+                        }
+                      />
+                    </div>
                     {decompFeedback ? (
-                      <ResultStateCard tone={decompFeedback.tone} title="Decomposition Status" message={decompFeedback.text} evidence={decompEvidence} />
+                      <ResultStateCard tone={decompFeedback.tone} title="分解状态" message={decompFeedback.text} evidence={decompEvidence} />
                     ) : (
-                      <div className="text-sm text-slate-500">Select mode and compute.</div>
+                      <div className="text-sm text-slate-500">选择分解模式后计算。</div>
                     )}
 
                     {decompResult?.mode === "lu" ? (
@@ -1124,9 +1084,9 @@ export default function Home() {
                 <section className="space-y-6">
                   <div className="studio-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-slate-900">Eigen Analysis</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">特征分析</h2>
                       <div className="flex items-center gap-2 text-sm">
-                        Size
+                        维度
                         <select
                           value={eigSize}
                           onChange={(event) => {
@@ -1140,7 +1100,7 @@ export default function Home() {
                             <option key={`eig-${size}`} value={size}>{size}</option>
                           ))}
                         </select>
-                        <button onClick={computeEigen} className="studio-primary-btn">Compute</button>
+                        <button onClick={computeEigen} className="studio-primary-btn">计算</button>
                       </div>
                     </div>
 
@@ -1163,25 +1123,42 @@ export default function Home() {
 
                 <aside className="space-y-6">
                   <div className="studio-card space-y-4">
-                    <h2 className="text-lg font-semibold text-slate-900">Result</h2>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-slate-900">结果</h2>
+                      <SaveToLibraryButton
+                        disabled={!eigResult}
+                        defaultName={suggestNameForContext(matrixInventory, "eigen")}
+                        onSave={(name) =>
+                          saveMatrixWithName(eigMatrix, name, "eigen", "standard")
+                        }
+                      />
+                    </div>
                     {eigFeedback ? (
-                      <ResultStateCard tone={eigFeedback.tone} title="Eigen Status" message={eigFeedback.text} />
+                      <ResultStateCard tone={eigFeedback.tone} title="特征分析状态" message={eigFeedback.text} />
                     ) : (
-                      <div className="text-sm text-slate-500">Input matrix and compute.</div>
+                      <div className="text-sm text-slate-500">输入矩阵后点击计算。</div>
                     )}
 
                     {eigResult ? (
                       <div className="space-y-4 text-sm text-slate-700">
                         <div>
                           {eigResult.multiplicities.map((item, idx) => (
-                            <div key={`m-${idx}`}>lambda={matrix.formatEigenComponent(item.value)}, alg={item.algebraic}, geo={item.geometric}</div>
+                            <div key={`m-${idx}`}>
+                              特征值 λ = {matrix.formatEigenComponent(item.value)}，代数重数 ={" "}
+                              {item.algebraic}，几何重数 = {item.geometric}
+                            </div>
                           ))}
                         </div>
                         {eigResult.eigenPairs.map((pair, idx) => (
                           <div key={`p-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                            <div className="font-semibold">lambda{idx + 1} = {matrix.formatEigenComponent(pair.value)}</div>
+                            <div className="font-semibold">
+                              第 {idx + 1} 对：λ = {matrix.formatEigenComponent(pair.value)}
+                            </div>
                             {pair.vector.map((component, cIdx) => (
-                              <div key={`v-${idx}-${cIdx}`} className="font-mono text-xs">v[{cIdx + 1}] = {matrix.formatEigenComponent(component)}</div>
+                              <div key={`v-${idx}-${cIdx}`} className="font-mono text-xs">
+                                特征向量分量 v[{cIdx + 1}] ={" "}
+                                {matrix.formatEigenComponent(component)}
+                              </div>
                             ))}
                           </div>
                         ))}
@@ -1196,8 +1173,16 @@ export default function Home() {
       </div>
 
       <footer className="mx-auto mt-10 w-full max-w-6xl rounded-3xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-500">
-        Matrix-first workflow · Partial Pivoting enabled by default
+        以矩阵为中心的工作流 · 默认启用列选主元
       </footer>
     </div>
   );
 }
+
+
+
+
+
+
+
+
