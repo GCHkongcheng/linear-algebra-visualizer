@@ -20,7 +20,7 @@ const copy = {
   sectionDev: "\u5f00\u53d1\u8005\u8bf4\u660e",
   sectionContact: "\u5f00\u53d1\u8005\u8054\u7cfb",
   paragraphOrigin:
-    "\u8fd9\u4e2a\u9879\u76ee\u5e0c\u671b\u628a\u7ebf\u6027\u4ee3\u6570\u4e2d\u7684\u62bd\u8c61\u6982\u5ff5\u8f6c\u5316\u4e3a\u53ef\u4ea4\u4e92\u3001\u53ef\u8ffd\u8e2a\u3001\u53ef\u9a8c\u8bc1\u7684\u8ba1\u7b97\u6d41\u7a0b\uff0c\u5e2e\u52a9\u5b66\u4e60\u8005\u4e0e\u5de5\u7a0b\u573a\u666f\u66f4\u7a33\u5b9a\u5730\u5f97\u5230\u53ef\u4fe1\u7ed3\u679c\u3002",
+    "\u57fa\u4e8e\u6709\u5173\u77e9\u9635\u7684\u8fd0\u7b97\u8f83\u4e3a\u590d\u6742\uff0c\u8fd9\u4e2a\u9879\u76ee\u5e0c\u671b\u628a\u7ebf\u6027\u4ee3\u6570\u4e2d\u7684\u62bd\u8c61\u6982\u5ff5\u8f6c\u5316\u4e3a\u53ef\u4ea4\u4e92\u3001\u53ef\u8ffd\u8e2a\u3001\u53ef\u9a8c\u8bc1\u7684\u8ba1\u7b97\u6d41\u7a0b\uff0c\u5e2e\u52a9\u5b66\u4e60\u8005\u4e0e\u5de5\u7a0b\u573a\u666f\u66f4\u7a33\u5b9a\u5730\u5f97\u5230\u53ef\u4fe1\u7ed3\u679c\u3002",
   paragraphStack:
     "\u7cfb\u7edf\u57fa\u4e8e Next.js \u6784\u5efa\u8def\u7531\u4e0e\u9875\u9762\uff0c\u4f7f\u7528 Tailwind CSS \u7ec4\u7ec7\u6837\u5f0f\uff0c\u5e76\u901a\u8fc7 Math.js \u63d0\u4f9b\u7ebf\u6027\u4ee3\u6570\u8ba1\u7b97\u80fd\u529b\u3002",
   paragraphDev:
@@ -94,7 +94,9 @@ export default function AboutPage() {
                 <Github size={16} />
                 {copy.repoLabel}
               </div>
-              <div className="break-all text-xs text-slate-600">{GITHUB_REPO}</div>
+              <div className="break-all text-xs text-slate-600">
+                {GITHUB_REPO}
+              </div>
               <div className="mt-3 inline-flex items-center gap-1 text-xs text-slate-500 group-hover:text-slate-800">
                 {copy.repoOpen}
                 <ExternalLink size={12} />
