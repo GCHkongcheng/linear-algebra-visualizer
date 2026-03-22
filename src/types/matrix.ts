@@ -11,7 +11,8 @@ export type MatrixOperation =
   | "subtract"
   | "multiply"
   | "inverse"
-  | "rank";
+  | "rank"
+  | "determinant";
 
 export type StepKind = "start" | "swap" | "eliminate" | "skip" | "done";
 

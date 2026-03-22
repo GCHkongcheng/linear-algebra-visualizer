@@ -4,7 +4,6 @@ import {
   Braces,
   Calculator,
   FunctionSquare,
-  Sigma,
   SplitSquareVertical,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -87,7 +86,8 @@ const OPERATION_OPTIONS = [
   { id: "subtract", label: "A - B" },
   { id: "multiply", label: "A * B" },
   { id: "inverse", label: "A^-1" },
-  { id: "rank", label: "rank(A)" },
+  { id: "rank", label: "\u79e9" },
+  { id: "determinant", label: "\u884c\u5217\u5f0f" },
   { id: "transpose", label: "转置" },
   { id: "simplify", label: "RREF" },
   { id: "scalar", label: "数乘" },
@@ -200,6 +200,7 @@ export default function Home() {
   const activeMatrixId = useMatrixLibraryStore((state) => state.activeMatrixId);
   const renameInventoryMatrix = useMatrixLibraryStore((state) => state.renameMatrix);
   const deleteInventoryMatrix = useMatrixLibraryStore((state) => state.deleteMatrix);
+  const addInventoryMatrix = useMatrixLibraryStore((state) => state.addMatrix);
   const setInventoryActiveMatrix = useMatrixLibraryStore((state) => state.setActiveMatrix);
   const saveCurrentResultToLibrary = useMatrixLibraryStore(
     (state) => state.saveCurrentResultToLibrary
@@ -282,7 +283,6 @@ export default function Home() {
     () => [
       { id: "operations", label: "矩阵运算", icon: Calculator },
       { id: "system", label: "线性方程组", icon: Braces },
-      { id: "determinant", label: "行列式", icon: Sigma },
       { id: "decomposition", label: "矩阵分解", icon: SplitSquareVertical },
       { id: "eigen", label: "特征分析", icon: FunctionSquare },
     ],
@@ -477,6 +477,35 @@ export default function Home() {
     loadMatrixToContext(item.data, activeLibraryContext);
   };
 
+  const handleSmartImportMatrix = (payload: {
+    name: string;
+    data: string[][];
+    type: MatrixKind;
+  }) => {
+    const created = addInventoryMatrix({
+      name: payload.name,
+      data: payload.data,
+      type: payload.type,
+    });
+
+    if (!created) {
+      pushToast({
+        tone: "error",
+        title: "智能识别",
+        message: "识别矩阵保存失败，请检查矩阵是否为规则二维结构。",
+      });
+      return;
+    }
+
+    setInventoryActiveMatrix(created.id, activeLibraryContext);
+    loadMatrixToContext(created.data, activeLibraryContext);
+    pushToast({
+      tone: "success",
+      title: "智能识别",
+      message: `已保存矩阵「${created.name}」并加载到当前模块。`,
+    });
+  };
+
   const handleSaveCurrentInputToLibrary = (name: string) => {
     const activeEditingMatrix =
       activeLibraryContext === "matrix-operations"
@@ -638,6 +667,7 @@ export default function Home() {
             onActivate={handleActivateInventoryMatrix}
             onDelete={deleteInventoryMatrix}
             onRename={renameInventoryMatrix}
+            onSmartImport={handleSmartImportMatrix}
           />
         </aside>
 
@@ -775,12 +805,6 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {/* status is shown via toast */}
-                    <div className="text-sm text-slate-500">
-                      {matrix.operations.feedback
-                        ? "运算状态已通过 Toast 提示。"
-                        : "请选择运算并点击计算。"}
-                    </div>
                     {matrix.operations.resultMatrix ? (
                       <>
                         <MatrixGrid matrix={matrix.operations.resultMatrix} displayMode={matrix.displayMode} />
@@ -799,6 +823,20 @@ export default function Home() {
                           </button>
                         </div>
                       </>
+                    ) : null}
+                    {!matrix.operations.resultMatrix &&
+                    (matrix.operations.operation === "rank" ||
+                      matrix.operations.operation === "determinant") &&
+                    matrix.operations.feedback ? (
+                      <div
+                        className={
+                          matrix.operations.feedback.tone === "error"
+                            ? "rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+                            : "rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono text-slate-700"
+                        }
+                      >
+                        {matrix.operations.feedback.text}
+                      </div>
                     ) : null}
                   </div>
                 </aside>
@@ -958,10 +996,6 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {/* status is shown via toast */}
-                    <div className="text-sm text-slate-500">
-                      {matrix.system.feedback ? "\u6c42\u89e3\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u6c42\u89e3\u540e\u67e5\u770b\u7ed3\u679c\u6458\u8981\u3002"}
-                    </div>
                     {matrix.system.summary ? (
                       <div className="space-y-2 text-sm">
                         <div>类型：{matrix.system.summary.type}</div>
@@ -1047,10 +1081,6 @@ export default function Home() {
                           saveMatrixWithName(detMatrix, name, "determinant", "standard")
                         }
                       />
-                    </div>
-                    {/* status is shown via toast */}
-                    <div className="text-sm text-slate-500">
-                      {detFeedback ? "\u884c\u5217\u5f0f\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u8f93\u5165\u77e9\u9635\u540e\u70b9\u51fb\u8ba1\u7b97\u3002"}
                     </div>
                     {detResult ? <div className="text-sm">det(A) = {matrix.formatValue(detResult)}</div> : null}
                   </div>
@@ -1158,10 +1188,6 @@ export default function Home() {
                         }
                       />
                     </div>
-                    {/* status is shown via toast */}
-                    <div className="text-sm text-slate-500">
-                      {decompFeedback ? "\u5206\u89e3\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u9009\u62e9\u5206\u89e3\u6a21\u5f0f\u540e\u8ba1\u7b97\u3002"}
-                    </div>
 
                     {decompResult?.mode === "lu" ? (
                       <>
@@ -1244,10 +1270,6 @@ export default function Home() {
                           saveMatrixWithName(eigMatrix, name, "eigen", "standard")
                         }
                       />
-                    </div>
-                    {/* status is shown via toast */}
-                    <div className="text-sm text-slate-500">
-                      {eigFeedback ? "\u7279\u5f81\u5206\u6790\u72b6\u6001\u5df2\u901a\u8fc7 Toast \u63d0\u793a\u3002" : "\u8f93\u5165\u77e9\u9635\u540e\u70b9\u51fb\u8ba1\u7b97\u3002"}
                     </div>
 
                     {eigResult ? (

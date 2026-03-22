@@ -2019,7 +2019,7 @@ export function describeStep(step: Step, mode: DisplayMode): string {
 }
 
 export function computeOperationResult(options: {
-  op: "transpose" | "simplify" | "scalar" | "square" | "add" | "subtract" | "multiply" | "inverse" | "rank";
+  op: "transpose" | "simplify" | "scalar" | "square" | "add" | "subtract" | "multiply" | "inverse" | "rank" | "determinant";
   matrixA: string[][];
   matrixB: string[][];
   scalar: string;
@@ -2029,7 +2029,7 @@ export function computeOperationResult(options: {
   if (op === "transpose") {
     return {
       matrix: transposeMatrix(matrixA),
-      text: "???????",
+      text: "\u77e9\u9635\u8f6c\u7f6e\u5df2\u5b8c\u6210",
       tone: "success",
     };
   }
@@ -2037,7 +2037,7 @@ export function computeOperationResult(options: {
   if (op === "simplify") {
     return {
       matrix: rrefMatrix(matrixA),
-      text: "行最简阶梯形（RREF）已生成",
+      text: "\u884c\u6700\u7b80\u9636\u68af\u5f62\uff08RREF\uff09\u5df2\u751f\u6210",
       tone: "success",
     };
   }
@@ -2045,7 +2045,7 @@ export function computeOperationResult(options: {
   if (op === "scalar") {
     return {
       matrix: scalarMultiplyMatrix(matrixA, simplifyExpr(scalar || "1")),
-      text: "???????",
+      text: "\u6570\u4e58\u8fd0\u7b97\u5df2\u5b8c\u6210",
       tone: "success",
     };
   }
@@ -2054,14 +2054,14 @@ export function computeOperationResult(options: {
     if (matrixA.length !== matrixA[0].length) {
       return {
         matrix: null,
-        text: "???????? A ???",
+        text: "A^2 \u4ec5\u652f\u6301\u65b9\u9635 A",
         tone: "error",
       };
     }
 
     return {
       matrix: multiplyMatrices(matrixA, matrixA),
-      text: "???? A?A ???",
+      text: "\u77e9\u9635\u5e73\u65b9 A*A \u5df2\u5b8c\u6210",
       tone: "success",
     };
   }
@@ -2070,7 +2070,7 @@ export function computeOperationResult(options: {
     if (matrixA.length !== matrixA[0].length) {
       return {
         matrix: null,
-        text: "??????? A ???",
+        text: "\u6c42\u9006\u4ec5\u652f\u6301\u65b9\u9635 A",
         tone: "error",
       };
     }
@@ -2079,14 +2079,14 @@ export function computeOperationResult(options: {
     if (!inverse) {
       return {
         matrix: null,
-        text: "矩阵不可逆（det(A)=0 或主元退化）",
+        text: "\u77e9\u9635\u4e0d\u53ef\u9006\uff08det(A)=0 \u6216\u4e3b\u5143\u9000\u5316\uff09",
         tone: "error",
       };
     }
 
     return {
       matrix: inverse,
-      text: "??? A?? ???",
+      text: "\u77e9\u9635 A \u7684\u9006\u5df2\u8ba1\u7b97",
       tone: "success",
     };
   }
@@ -2094,7 +2094,23 @@ export function computeOperationResult(options: {
   if (op === "rank") {
     return {
       matrix: null,
-      text: `rank(A) = ${rankMatrix(matrixA)}`,
+      text: `rank(A) = ${rankMatrix(matrixA)}` ,
+      tone: "success",
+    };
+  }
+
+  if (op === "determinant") {
+    if (matrixA.length !== matrixA[0].length) {
+      return {
+        matrix: null,
+        text: "\u884c\u5217\u5f0f\u8ba1\u7b97\u4ec5\u652f\u6301\u65b9\u9635 A",
+        tone: "error",
+      };
+    }
+
+    return {
+      matrix: null,
+      text: `det(A) = ${determinant(matrixA)}`,
       tone: "success",
     };
   }
@@ -2103,14 +2119,14 @@ export function computeOperationResult(options: {
     if (matrixA[0].length !== matrixB.length) {
       return {
         matrix: null,
-        text: "?????? A ????? B ???",
+        text: "\u77e9\u9635\u4e58\u6cd5\u8981\u6c42 A \u7684\u5217\u6570\u7b49\u4e8e B \u7684\u884c\u6570",
         tone: "error",
       };
     }
 
     return {
       matrix: multiplyMatrices(matrixA, matrixB),
-      text: "???? A?B ???",
+      text: "\u77e9\u9635\u4e58\u6cd5 A*B \u5df2\u5b8c\u6210",
       tone: "success",
     };
   }
@@ -2122,27 +2138,25 @@ export function computeOperationResult(options: {
     ) {
       return {
         matrix: null,
-        text: op === "add" ? "??????????" : "??????????",
+        text: op === "add"
+          ? "\u77e9\u9635\u52a0\u6cd5\u8981\u6c42 A \u4e0e B \u540c\u578b"
+          : "\u77e9\u9635\u51cf\u6cd5\u8981\u6c42 A \u4e0e B \u540c\u578b",
         tone: "error",
       };
     }
 
     return {
       matrix: op === "add" ? addMatrices(matrixA, matrixB) : subtractMatrices(matrixA, matrixB),
-      text: op === "add" ? "???? A+B ???" : "???? A-B ???",
+      text: op === "add"
+        ? "\u77e9\u9635\u52a0\u6cd5 A+B \u5df2\u5b8c\u6210"
+        : "\u77e9\u9635\u51cf\u6cd5 A-B \u5df2\u5b8c\u6210",
       tone: "success",
     };
   }
 
   return {
     matrix: null,
-    text: "不支持的运算",
+    text: "\u4e0d\u652f\u6301\u7684\u8fd0\u7b97",
     tone: "error",
   };
 }
-
-
-
-
-
-
