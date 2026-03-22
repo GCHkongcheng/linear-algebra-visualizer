@@ -3,9 +3,11 @@
 import {
   Braces,
   Calculator,
+  CircleHelp,
   FunctionSquare,
   SplitSquareVertical,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MatrixGrid } from "@/components/matrix/MatrixGrid";
@@ -614,8 +616,14 @@ export default function Home() {
   return (
     <div className="min-h-screen px-6 py-10 text-[15px] text-slate-900">
       <header className="mx-auto w-full max-w-6xl space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
-          线性代数工作室
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
+            线性代数工作室
+          </div>
+          <Link href="/about" className="step-control" aria-label="打开关于页面">
+            <CircleHelp size={14} />
+            关于页面
+          </Link>
         </div>
         <h1 className="text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
           线性代数工作台

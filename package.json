@@ -10,6 +10,7 @@
     "test:math": "node scripts/run-math-tests.mjs"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "fraction.js": "^5.3.4",
     "lucide-react": "^0.577.0",
     "mathjs": "^15.1.1",

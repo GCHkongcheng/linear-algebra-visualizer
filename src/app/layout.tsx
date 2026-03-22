@@ -1,30 +1,63 @@
-import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
+﻿import type { Metadata, Viewport } from "next";
+
+import { getSiteUrl, siteConfig } from "@/lib/site";
 
 import "./globals.css";
 
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
-
-const plexSerif = IBM_Plex_Serif({
-  variable: "--font-plex-serif",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
-  title: "Linear Algebra Studio",
-  description:
-    "面向线性代数教学与计算的可视化工具，支持矩阵运算、方程组求解与步骤演示。",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  keywords: siteConfig.keywords,
+  applicationName: siteConfig.name,
+  creator: siteConfig.name,
+  authors: [{ name: siteConfig.name, url: siteConfig.githubRepo }],
+  publisher: siteConfig.name,
+  alternates: {
+    canonical: "/",
+  },
+  category: "education",
+  openGraph: {
+    title: siteConfig.name,
+    description: siteConfig.description,
+    url: siteUrl,
+    siteName: siteConfig.name,
+    locale: "zh_CN",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.name,
+    description: siteConfig.description,
+    creator: siteConfig.name,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  icons: {
+    icon: [{ url: "/favicon.ico" }],
+    shortcut: [{ url: "/favicon.ico" }],
+    apple: [{ url: "/favicon.ico" }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#ea580c",
 };
 
 export default function RootLayout({
@@ -32,11 +65,33 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: siteConfig.name,
+    applicationCategory: "EducationalApplication",
+    operatingSystem: "Web",
+    description: siteConfig.description,
+    url: siteUrl,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    author: {
+      "@type": "Organization",
+      name: siteConfig.name,
+      url: siteConfig.githubRepo,
+    },
+  };
+
   return (
     <html lang="zh-CN">
-      <body
-        className={`${plexSans.variable} ${plexSerif.variable} ${plexMono.variable} antialiased`}
-      >
+      <body className="antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         {children}
       </body>
     </html>

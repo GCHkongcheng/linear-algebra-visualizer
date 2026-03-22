@@ -1,4 +1,5 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: #f8f4ee;
@@ -10,9 +11,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-plex-sans);
-  --font-serif: var(--font-plex-serif);
-  --font-mono: var(--font-plex-mono);
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "STSong", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -23,8 +24,7 @@ body {
   min-height: 100vh;
   background: radial-gradient(1200px 680px at 8% 0%, #fff9f0 0%, #f4eee5 45%, #f1ece3 100%);
   color: var(--foreground);
-  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
 }
 
 .studio-card {
@@ -259,3 +259,5 @@ body {
   background: rgb(248 250 252);
   padding: 0.8rem;
 }
+
+
