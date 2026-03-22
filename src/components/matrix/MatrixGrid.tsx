@@ -36,13 +36,17 @@ export function MatrixGrid({
     );
   }
 
+  const colCount = matrix[0].length;
+  const compact = colCount > 4;
+  const minCellWidth = compact ? (editable ? 58 : 54) : 70;
+
   return (
     <div className={`matrix-surface ${className}`}>
       <div className="matrix-scroll">
         <div
-          className="grid gap-2"
+          className="matrix-grid grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${matrix[0].length}, minmax(70px, 1fr))`,
+            gridTemplateColumns: `repeat(${colCount}, minmax(${minCellWidth}px, 1fr))`,
           }}
         >
           {matrix.map((row, r) =>
@@ -90,4 +94,3 @@ export function MatrixGrid({
     </div>
   );
 }
-

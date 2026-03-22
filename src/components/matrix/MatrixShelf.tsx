@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   Camera,
@@ -34,12 +34,51 @@ type BarcodeDetectorLike = {
   detect: (image: ImageBitmap) => Promise<Array<{ rawValue?: string }>>;
 };
 
+const text = {
+  shelf: "\u77e9\u9635\u5e93",
+  countSuffix: "\u4e2a\u77e9\u9635",
+  emptyMatrix: "\u7a7a\u77e9\u9635",
+  noSaved: "\u8fd8\u6ca1\u6709\u4fdd\u5b58\u7684\u77e9\u9635\u3002",
+  collapse: "\u6536\u8d77\u77e9\u9635\u5e93",
+  expand: "\u5c55\u5f00\u77e9\u9635\u5e93",
+  rename: "\u91cd\u547d\u540d",
+  saveName: "\u4fdd\u5b58\u540d\u79f0",
+  remove: "\u5220\u9664",
+  active: "\u8bbe\u4e3a\u5f53\u524d\u6d3b\u52a8\u77e9\u9635",
+  standard: "\u666e\u901a\u77e9\u9635",
+  augmented: "\u589e\u5e7f\u77e9\u9635",
+  smart: "\u667a\u80fd\u8bc6\u522b",
+  close: "\u5173\u95ed",
+  scan: "\u62cd\u7167\u626b\u7801",
+  scanning: "\u8bc6\u522b\u4e2d...",
+  confirmPreview: "\u786e\u8ba4\u5e76\u751f\u6210\u53ef\u7f16\u8f91\u77e9\u9635",
+  backInput: "\u8fd4\u56de\u8bc6\u522b",
+  saveLibrary: "\u4fdd\u5b58\u5230\u77e9\u9635\u5e93",
+  matrixName: "\u77e9\u9635\u540d\u79f0",
+  matrixType: "\u7c7b\u578b",
+  matrixSize: "\u7ef4\u5ea6",
+  inputPlaceholder: "1,1;2,2;3,3  \u6216  1,2|3;4,5|6",
+  helper:
+    "\u8f93\u5165 1,1;2,2;3,3 \u6216\u4e0a\u4f20\u4e8c\u7ef4\u7801\uff0c\u786e\u8ba4\u540e\u53ef\u7ee7\u7eed\u7f16\u8f91\u77e9\u9635\u3002",
+  errEmptyInput: "\u8bf7\u8f93\u5165\u77e9\u9635\u5185\u5bb9\u540e\u518d\u8bc6\u522b\u3002",
+  errNoRows: "\u672a\u8bc6\u522b\u5230\u6709\u6548\u884c\uff0c\u8bf7\u68c0\u67e5\u8f93\u5165\u683c\u5f0f\u3002",
+  errEmptyCell:
+    "\u5b58\u5728\u7a7a\u884c\u6216\u7a7a\u5217\uff0c\u8bf7\u68c0\u67e5\u5206\u9694\u7b26\uff08\u9017\u53f7/\u5206\u53f7\uff09\u3002",
+  errNoCols: "\u672a\u8bc6\u522b\u5230\u5217\u6570\u636e\uff0c\u8bf7\u68c0\u67e5\u8f93\u5165\u3002",
+  errUneven: "\u5404\u884c\u5217\u6570\u4e0d\u4e00\u81f4\uff0c\u65e0\u6cd5\u751f\u6210\u77e9\u9635\u3002",
+  errAugCols: "\u589e\u5e7f\u77e9\u9635\u81f3\u5c11\u9700\u8981\u4e24\u5217\u3002",
+  errNoDetector: "\u5f53\u524d\u6d4f\u89c8\u5668\u6682\u4e0d\u652f\u6301\u626b\u7801\u8bc6\u522b\uff0c\u8bf7\u6539\u7528\u6587\u672c\u8f93\u5165\u3002",
+  errNoQr: "\u672a\u8bc6\u522b\u5230\u4e8c\u7ef4\u7801\u5185\u5bb9\uff0c\u8bf7\u91cd\u8bd5\u6216\u6539\u7528\u6587\u672c\u8f93\u5165\u3002",
+  errScanFail: "\u626b\u7801\u5931\u8d25\uff0c\u8bf7\u786e\u8ba4\u56fe\u7247\u6e05\u6670\u6216\u6539\u7528\u6587\u672c\u8f93\u5165\u3002",
+  errNoData: "\u77e9\u9635\u5185\u5bb9\u4e3a\u7a7a\uff0c\u65e0\u6cd5\u4fdd\u5b58\u3002",
+} as const;
+
 function splitRowCells(raw: string): string[] {
   const normalized = raw
     .trim()
-    .replaceAll("，", ",")
-    .replaceAll("；", ";")
-    .replaceAll("｜", "|");
+    .replaceAll("\uFF0C", ",")
+    .replaceAll("\uFF1B", ";")
+    .replaceAll("\uFF5C", "|");
 
   if (!normalized) return [];
 
@@ -63,17 +102,17 @@ function splitRowCells(raw: string): string[] {
     .filter(Boolean);
 }
 
-function parseSmartMatrixText(text: string): ParseResult {
-  const cleaned = text.trim();
+function parseSmartMatrixText(textInput: string): ParseResult {
+  const cleaned = textInput.trim();
   if (!cleaned) {
-    return { ok: false, error: "请输入矩阵内容后再识别。" };
+    return { ok: false, error: text.errEmptyInput };
   }
 
   const normalized = cleaned
     .replace(/\r\n/g, "\n")
-    .replaceAll("，", ",")
-    .replaceAll("；", ";")
-    .replaceAll("｜", "|");
+    .replaceAll("\uFF0C", ",")
+    .replaceAll("\uFF1B", ";")
+    .replaceAll("\uFF5C", "|");
 
   const rowsRaw =
     normalized.includes("\n")
@@ -84,7 +123,7 @@ function parseSmartMatrixText(text: string): ParseResult {
 
   const rows = rowsRaw.map((row) => row.trim()).filter(Boolean);
   if (!rows.length) {
-    return { ok: false, error: "未识别到有效行，请检查输入格式。" };
+    return { ok: false, error: text.errNoRows };
   }
 
   let sawAugmented = false;
@@ -102,20 +141,20 @@ function parseSmartMatrixText(text: string): ParseResult {
   });
 
   if (parsedRows.some((row) => row.length === 0)) {
-    return { ok: false, error: "存在空行或空列，请检查分隔符（逗号/分号）。" };
+    return { ok: false, error: text.errEmptyCell };
   }
 
   const colCount = parsedRows[0].length;
   if (colCount === 0) {
-    return { ok: false, error: "未识别到列数据，请检查输入。" };
+    return { ok: false, error: text.errNoCols };
   }
 
   if (parsedRows.some((row) => row.length !== colCount)) {
-    return { ok: false, error: "各行列数不一致，无法生成矩阵。" };
+    return { ok: false, error: text.errUneven };
   }
 
   if (sawAugmented && colCount < 2) {
-    return { ok: false, error: "增广矩阵至少需要两列。" };
+    return { ok: false, error: text.errAugCols };
   }
 
   return {
@@ -126,21 +165,21 @@ function parseSmartMatrixText(text: string): ParseResult {
 }
 
 function PreviewGrid({ item }: { item: MatrixRecord }) {
-  const previewRows = item.data.slice(0, 3);
-  const previewCols = Math.min(item.data[0]?.length ?? 0, 4);
+  const previewRows = item.data;
+  const previewCols = item.data[0]?.length ?? 0;
 
   if (previewRows.length === 0 || previewCols === 0) {
-    return <div className="text-[11px] text-slate-500">空矩阵</div>;
+    return <div className="text-[11px] text-slate-500">{text.emptyMatrix}</div>;
   }
 
   return (
-    <div className="overflow-auto">
+    <div className="max-h-36 overflow-auto rounded-lg border border-slate-100 bg-white/70 p-1">
       <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${previewCols}, minmax(26px, 1fr))` }}
+        className="grid w-max gap-1"
+        style={{ gridTemplateColumns: `repeat(${previewCols}, minmax(30px, auto))` }}
       >
         {previewRows.map((row, r) =>
-          row.slice(0, previewCols).map((value, c) => {
+          row.map((value, c) => {
             const markAugmentedDivider = item.type === "augmented" && c === previewCols - 1;
             return (
               <div
@@ -175,14 +214,17 @@ export function MatrixShelf({
   const [smartOpen, setSmartOpen] = useState(false);
   const [smartStep, setSmartStep] = useState<"input" | "preview">("input");
   const [smartRawText, setSmartRawText] = useState("");
-  const [smartDraftName, setSmartDraftName] = useState("识别矩阵");
+  const [smartDraftName, setSmartDraftName] = useState("\u8bc6\u522b\u77e9\u9635");
   const [smartType, setSmartType] = useState<MatrixKind>("standard");
   const [smartPreview, setSmartPreview] = useState<string[][]>([]);
   const [smartError, setSmartError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
-  const itemCountLabel = useMemo(() => `${items.length} 个矩阵`, [items.length]);
+  const itemCountLabel = useMemo(
+    () => `${items.length} ${text.countSuffix}`,
+    [items.length]
+  );
 
   const startRename = (item: MatrixRecord) => {
     setEditingId(item.id);
@@ -200,7 +242,7 @@ export function MatrixShelf({
     setSmartOpen(true);
     setSmartStep("input");
     setSmartRawText("");
-    setSmartDraftName("识别矩阵");
+    setSmartDraftName("\u8bc6\u522b\u77e9\u9635");
     setSmartType("standard");
     setSmartPreview([]);
     setSmartError(null);
@@ -212,8 +254,8 @@ export function MatrixShelf({
     setScanning(false);
   };
 
-  const buildEditablePreview = (text: string) => {
-    const parsed = parseSmartMatrixText(text);
+  const buildEditablePreview = (raw: string) => {
+    const parsed = parseSmartMatrixText(raw);
     if (!parsed.ok) {
       setSmartError(parsed.error);
       return;
@@ -241,7 +283,7 @@ export function MatrixShelf({
     ).BarcodeDetector;
 
     if (!Detector) {
-      setSmartError("当前浏览器暂不支持扫码识别，请改用文本输入。");
+      setSmartError(text.errNoDetector);
       return;
     }
 
@@ -259,14 +301,14 @@ export function MatrixShelf({
       const rawValue = result[0]?.rawValue?.trim();
 
       if (!rawValue) {
-        setSmartError("未识别到二维码内容，请重试或改用文本输入。");
+        setSmartError(text.errNoQr);
         return;
       }
 
       setSmartRawText(rawValue);
       buildEditablePreview(rawValue);
     } catch {
-      setSmartError("扫码失败，请确认图片清晰或改用文本输入。");
+      setSmartError(text.errScanFail);
     } finally {
       if (bitmap) bitmap.close();
       setScanning(false);
@@ -283,12 +325,12 @@ export function MatrixShelf({
 
   const confirmSmartSave = () => {
     if (!smartPreview.length || !smartPreview[0]?.length) {
-      setSmartError("矩阵内容为空，无法保存。");
+      setSmartError(text.errNoData);
       return;
     }
 
     onSmartImport({
-      name: smartDraftName.trim() || "识别矩阵",
+      name: smartDraftName.trim() || "\u8bc6\u522b\u77e9\u9635",
       data: smartPreview,
       type: smartType,
     });
@@ -297,11 +339,20 @@ export function MatrixShelf({
 
   if (collapsed) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
+      <div className="space-y-2 rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
+        <button
+          onClick={openSmartDialog}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700"
+          title={text.smart}
+          type="button"
+        >
+          <Sparkles size={14} />
+        </button>
         <button
           onClick={() => setCollapsed(false)}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700"
-          title="展开矩阵库"
+          title={text.expand}
+          type="button"
         >
           <ChevronsRight size={16} />
           <span>{items.length}</span>
@@ -315,7 +366,7 @@ export function MatrixShelf({
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            矩阵库
+            {text.shelf}
           </div>
           <div className="text-[11px] text-slate-500">{itemCountLabel}</div>
         </div>
@@ -323,16 +374,16 @@ export function MatrixShelf({
           <button
             onClick={openSmartDialog}
             className="step-control"
-            title="智能识别"
+            title={text.smart}
             type="button"
           >
             <Sparkles size={14} />
-            智能识别
+            {text.smart}
           </button>
           <button
             onClick={() => setCollapsed(true)}
             className="rounded-lg border border-slate-200 p-1 text-slate-600"
-            title="收起矩阵库"
+            title={text.collapse}
             type="button"
           >
             <ChevronsLeft size={16} />
@@ -343,7 +394,7 @@ export function MatrixShelf({
       <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
         {items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-xs text-slate-500">
-            还没有保存的矩阵。
+            {text.noSaved}
           </div>
         ) : null}
 
@@ -389,7 +440,7 @@ export function MatrixShelf({
                     <button
                       onClick={confirmRename}
                       className="rounded-md border border-slate-200 p-1 text-slate-700"
-                      title="保存名称"
+                      title={text.saveName}
                     >
                       <Check size={14} />
                     </button>
@@ -397,7 +448,7 @@ export function MatrixShelf({
                     <button
                       onClick={() => startRename(item)}
                       className="rounded-md border border-slate-200 p-1 text-slate-700"
-                      title="重命名"
+                      title={text.rename}
                     >
                       <Pencil size={14} />
                     </button>
@@ -406,7 +457,7 @@ export function MatrixShelf({
                   <button
                     onClick={() => onDelete(item.id)}
                     className="rounded-md border border-rose-200 p-1 text-rose-600"
-                    title="删除"
+                    title={text.remove}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -419,14 +470,14 @@ export function MatrixShelf({
                 <span>
                   {item.data.length}x{item.data[0]?.length ?? 0}
                 </span>
-                <span>{item.type === "augmented" ? "增广矩阵" : "普通矩阵"}</span>
+                <span>{item.type === "augmented" ? text.augmented : text.standard}</span>
               </div>
 
               <button
                 onClick={() => onActivate(item)}
                 className="mt-2 step-control w-full justify-center"
               >
-                设为当前活动矩阵
+                {text.active}
               </button>
             </div>
           );
@@ -442,13 +493,11 @@ export function MatrixShelf({
           <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-900">智能识别</div>
-                <div className="mt-1 text-xs text-slate-500">
-                  输入 `1,1;2,2;3,3` 或上传二维码图片，确认后可继续编辑矩阵。
-                </div>
+                <div className="text-sm font-semibold text-slate-900">{text.smart}</div>
+                <div className="mt-1 text-xs text-slate-500">{text.helper}</div>
               </div>
               <button onClick={closeSmartDialog} className="step-control" type="button">
-                关闭
+                {text.close}
               </button>
             </div>
 
@@ -458,7 +507,7 @@ export function MatrixShelf({
                   value={smartRawText}
                   onChange={(event) => setSmartRawText(event.target.value)}
                   className="studio-input min-h-36 resize-y"
-                  placeholder="示例：1,1;2,2;3,3 或 1,2|3;4,5|6"
+                  placeholder={text.inputPlaceholder}
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
@@ -468,14 +517,14 @@ export function MatrixShelf({
                     disabled={scanning}
                   >
                     <Camera size={14} />
-                    {scanning ? "识别中..." : "拍照扫码"}
+                    {scanning ? text.scanning : text.scan}
                   </button>
                   <button
                     onClick={() => buildEditablePreview(smartRawText)}
                     className="step-control step-control-primary"
                     type="button"
                   >
-                    确认并生成可编辑矩阵
+                    {text.confirmPreview}
                   </button>
                 </div>
               </div>
@@ -485,9 +534,9 @@ export function MatrixShelf({
                   <div className="matrix-surface">
                     <div className="matrix-scroll">
                       <div
-                        className="grid gap-2"
+                        className="matrix-grid grid gap-2"
                         style={{
-                          gridTemplateColumns: `repeat(${smartPreview[0]?.length ?? 1}, minmax(70px, 1fr))`,
+                          gridTemplateColumns: `repeat(${smartPreview[0]?.length ?? 1}, minmax(58px, 1fr))`,
                         }}
                       >
                         {smartPreview.map((row, r) =>
@@ -516,7 +565,7 @@ export function MatrixShelf({
 
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block text-xs text-slate-500">矩阵名称</label>
+                      <label className="mb-1 block text-xs text-slate-500">{text.matrixName}</label>
                       <input
                         value={smartDraftName}
                         onChange={(event) => setSmartDraftName(event.target.value)}
@@ -524,18 +573,18 @@ export function MatrixShelf({
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-slate-500">类型</label>
+                      <label className="mb-1 block text-xs text-slate-500">{text.matrixType}</label>
                       <select
                         value={smartType}
                         onChange={(event) => setSmartType(event.target.value as MatrixKind)}
                         className="studio-select w-full"
                       >
-                        <option value="standard">普通矩阵</option>
-                        <option value="augmented">增广矩阵</option>
+                        <option value="standard">{text.standard}</option>
+                        <option value="augmented">{text.augmented}</option>
                       </select>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                      维度：{smartPreview.length}x{smartPreview[0]?.length ?? 0}
+                      {text.matrixSize}：{smartPreview.length}x{smartPreview[0]?.length ?? 0}
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
                       <button
@@ -543,14 +592,14 @@ export function MatrixShelf({
                         className="step-control"
                         type="button"
                       >
-                        返回识别
+                        {text.backInput}
                       </button>
                       <button
                         onClick={confirmSmartSave}
                         className="step-control step-control-primary"
                         type="button"
                       >
-                        保存到矩阵库
+                        {text.saveLibrary}
                       </button>
                     </div>
                   </div>
@@ -578,4 +627,3 @@ export function MatrixShelf({
     </div>
   );
 }
-

@@ -143,6 +143,10 @@ body {
   gap: 1.5rem;
 }
 
+.workspace-grid > * {
+  min-width: 0;
+}
+
 .step-detail-grid {
   display: grid;
   gap: 0.9rem;
@@ -171,6 +175,12 @@ body {
   max-width: 100%;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.matrix-grid {
+  width: max-content;
+  min-width: 100%;
 }
 
 .matrix-cell {
@@ -259,5 +269,17 @@ body {
   background: rgb(248 250 252);
   padding: 0.8rem;
 }
+
+@media (max-width: 640px) {
+  .matrix-surface {
+    padding: 0.62rem;
+  }
+
+  .matrix-cell {
+    font-size: 0.78rem;
+    padding: 0.38rem 0.34rem;
+  }
+}
+
 
 
