@@ -178,6 +178,11 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.matrix-grid-fit {
+  width: 100%;
+}
+
+.matrix-grid-scroll,
 .matrix-grid {
   width: max-content;
   min-width: 100%;
@@ -280,6 +285,8 @@ body {
     padding: 0.38rem 0.34rem;
   }
 }
+
+
 
 
 

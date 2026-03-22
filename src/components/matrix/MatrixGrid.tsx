@@ -37,14 +37,28 @@ export function MatrixGrid({
   }
 
   const colCount = matrix[0].length;
-  const compact = colCount > 4;
-  const minCellWidth = compact ? (editable ? 58 : 54) : 70;
+  const useScrollLayout = colCount > 5;
+
+  const minCellWidth =
+    colCount <= 3
+      ? 70
+      : colCount === 4
+        ? editable
+          ? 52
+          : 48
+        : colCount === 5
+          ? editable
+            ? 42
+            : 40
+          : editable
+            ? 56
+            : 52;
 
   return (
     <div className={`matrix-surface ${className}`}>
       <div className="matrix-scroll">
         <div
-          className="matrix-grid grid gap-2"
+          className={`grid gap-2 ${useScrollLayout ? "matrix-grid-scroll" : "matrix-grid-fit"}`}
           style={{
             gridTemplateColumns: `repeat(${colCount}, minmax(${minCellWidth}px, 1fr))`,
           }}
