@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import {
+  AlertTriangle,
   Braces,
   Calculator,
   CircleHelp,
@@ -58,7 +59,13 @@ import {
   useMatrixLibraryStore,
 } from "@/store/matrix-library";
 
-type TabId = "operations" | "system" | "determinant" | "decomposition" | "eigen";
+type TabId =
+  | "operations"
+  | "system"
+  | "determinant"
+  | "decomposition"
+  | "eigen"
+  | "errorAnalysis";
 type DecompositionMode = "lu" | "luPlain" | "qr" | "cholesky";
 
 type Feedback = {
@@ -321,6 +328,7 @@ export default function Home() {
       { id: "system", label: "线性方程组", icon: Braces },
       { id: "decomposition", label: "矩阵分解", icon: SplitSquareVertical },
       { id: "eigen", label: "特征分析", icon: FunctionSquare },
+      { id: "errorAnalysis", label: "误差分析", icon: AlertTriangle },
     ],
     []
   );
@@ -537,6 +545,7 @@ export default function Home() {
     if (activeTab === "system") return "linear-system";
     if (activeTab === "determinant") return "determinant";
     if (activeTab === "decomposition") return "decomposition";
+    if (activeTab === "errorAnalysis") return "eigen";
     return "eigen";
   }, [activeTab]);
 
@@ -1448,10 +1457,14 @@ export default function Home() {
                           className="studio-select"
                         >
                           {matrix.sizeOptions.map((size) => (
-                            <option key={`eig-${size}`} value={size}>{size}</option>
+                            <option key={`eig-${size}`} value={size}>
+                              {size}
+                            </option>
                           ))}
                         </select>
-                        <button onClick={computeEigen} className="studio-primary-btn">计算</button>
+                        <button onClick={computeEigen} className="studio-primary-btn">
+                          计算
+                        </button>
                       </div>
                     </div>
 
@@ -1497,7 +1510,10 @@ export default function Home() {
                           ))}
                         </div>
                         {eigResult.eigenPairs.map((pair, idx) => (
-                          <div key={`p-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div
+                            key={`p-${idx}`}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                          >
                             <div className="font-semibold">
                               第 {idx + 1} 对：λ = {matrix.formatEigenComponent(pair.value)}
                             </div>
@@ -1516,14 +1532,64 @@ export default function Home() {
                       </div>
                     )}
                   </div>
+                </aside>
+              </div>
+            </div>
+          )}
 
+          {activeTab === "errorAnalysis" && (
+            <div className="workspace-container">
+              <div className="workspace-grid">
+                <section className="space-y-6">
                   <div className="studio-card space-y-4">
-                    <h2 className="text-lg font-semibold text-slate-900">误差分析</h2>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-slate-900">误差分析</h2>
+                      <div className="flex items-center gap-2 text-sm">
+                        维度
+                        <select
+                          value={eigSize}
+                          onChange={(event) => {
+                            const next = Number(event.target.value);
+                            setEigSize(next);
+                            setEigMatrix((prev) => resizeInputMatrix(prev, next, next, "0"));
+                            resizeEigenVectorB(next);
+                            setEigPerturbationResult(null);
+                          }}
+                          className="studio-select"
+                        >
+                          {matrix.sizeOptions.map((size) => (
+                            <option key={`error-${size}`} value={size}>
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
+                    <MatrixGrid
+                      matrix={eigMatrix.map((row) => row.map((value) => value || "0"))}
+                      inputMatrix={eigMatrix}
+                      editable
+                      displayMode={matrix.displayMode}
+                      onChange={(r, c, value) => {
+                        setEigMatrix((prev) => {
+                          const next = prev.map((line) => line.slice());
+                          next[r][c] = value;
+                          return next;
+                        });
+                        setEigPerturbationResult(null);
+                      }}
+                      onPasteMatrix={pasteEigenMatrix}
+                    />
+                  </div>
+                </section>
+
+                <aside className="space-y-6">
+                  <div className="studio-card space-y-4">
+                    <h2 className="text-lg font-semibold text-slate-900">条件数分析</h2>
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                      <div className="font-semibold text-slate-800">条件数分析</div>
                       {eigenCondition ? (
-                        <div className="mt-2 space-y-1 text-xs text-slate-600">
+                        <div className="space-y-1 text-xs text-slate-600">
                           <div>||A||₁ = {formatMetric(eigenCondition.norm1)}</div>
                           <div>||A||∞ = {formatMetric(eigenCondition.normInf)}</div>
                           <div>cond₁(A) = {formatMetric(eigenCondition.cond1)}</div>
@@ -1535,102 +1601,102 @@ export default function Home() {
                           ) : null}
                         </div>
                       ) : (
-                        <div className="mt-2 text-xs text-slate-500">
+                        <div className="text-xs text-slate-500">
                           当前输入不是合法数值方阵，暂时无法计算条件数。
                         </div>
                       )}
                     </div>
+                  </div>
 
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                      <div className="text-sm font-semibold text-slate-800">扰动实验（ε = 10^-6）</div>
-                      <p className="text-xs text-slate-600">
-                        可在 A 或 b 上施加随机微扰，比较特征值与解向量变化的相对误差。
-                      </p>
+                  <div className="studio-card space-y-4">
+                    <h2 className="text-lg font-semibold text-slate-900">扰动实验（ε = 10^-6）</h2>
+                    <p className="text-xs text-slate-600">
+                      可在 A 或 b 上施加随机微扰，比较特征值与解向量变化的相对误差。
+                    </p>
 
-                      <div>
-                        <div className="mb-2 text-xs font-semibold tracking-wide text-slate-600">
-                          线性系统向量 b（用于 Ax=b 的灵敏度对比）
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {eigVectorB.map((value, idx) => (
-                            <label
-                              key={`eig-b-${idx}`}
-                              className="flex items-center gap-2 text-xs text-slate-600"
-                            >
-                              b{idx + 1}
-                              <input
-                                value={value}
-                                onChange={(event) => {
-                                  const nextValue = event.target.value;
-                                  setEigVectorB((prev) =>
-                                    prev.map((item, itemIdx) =>
-                                      itemIdx === idx ? nextValue : item
-                                    )
-                                  );
-                                  setEigPerturbationResult(null);
-                                }}
-                                className="studio-input"
-                              />
-                            </label>
-                          ))}
-                        </div>
+                    <div>
+                      <div className="mb-2 text-xs font-semibold tracking-wide text-slate-600">
+                        线性系统向量 b（用于 Ax=b 的灵敏度对比）
                       </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => runEigenPerturbationTest("A")}
-                          className="studio-primary-btn"
-                        >
-                          随机扰动 A
-                        </button>
-                        <button
-                          onClick={() => runEigenPerturbationTest("b")}
-                          className="studio-primary-btn"
-                        >
-                          随机扰动 b
-                        </button>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {eigVectorB.map((value, idx) => (
+                          <label
+                            key={`eig-b-${idx}`}
+                            className="flex items-center gap-2 text-xs text-slate-600"
+                          >
+                            b{idx + 1}
+                            <input
+                              value={value}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                setEigVectorB((prev) =>
+                                  prev.map((item, itemIdx) =>
+                                    itemIdx === idx ? nextValue : item
+                                  )
+                                );
+                                setEigPerturbationResult(null);
+                              }}
+                              className="studio-input"
+                            />
+                          </label>
+                        ))}
                       </div>
-
-                      {eigPerturbationResult ? (
-                        <div className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700">
-                          <div>
-                            本次扰动对象：{eigPerturbationResult.target}，ε ={" "}
-                            {eigPerturbationResult.epsilon.toExponential(0)}
-                          </div>
-                          <div>
-                            相对扰动 ||ΔA||∞ / ||A||∞ ={" "}
-                            {formatMetric(eigPerturbationResult.matrixRelativeError)}
-                          </div>
-                          <div>
-                            相对扰动 ||Δb||∞ / ||b||∞ ={" "}
-                            {formatMetric(eigPerturbationResult.vectorRelativeError)}
-                          </div>
-                          <div>
-                            特征值相对误差 max|Δλ|/max|λ| ={" "}
-                            {formatMetric(eigPerturbationResult.eigenRelativeError)}
-                          </div>
-                          <div>
-                            解向量相对误差 ||Δx||∞ / ||x||∞ ={" "}
-                            {formatMetric(eigPerturbationResult.solutionRelativeError)}
-                          </div>
-                          {eigPerturbationResult.baselineSolution &&
-                          eigPerturbationResult.perturbedSolution ? (
-                            <>
-                              <div className="pt-1 text-slate-600">
-                                原始解 x = [{eigPerturbationResult.baselineSolution.join(", ")}]
-                              </div>
-                              <div className="text-slate-600">
-                                扰动后解 x̃ = [{eigPerturbationResult.perturbedSolution.join(", ")}]
-                              </div>
-                            </>
-                          ) : (
-                            <div className="pt-1 text-amber-700">
-                              由于 A 不可逆或接近奇异，无法稳定求解 Ax=b 的误差对比。
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
                     </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => runEigenPerturbationTest("A")}
+                        className="studio-primary-btn"
+                      >
+                        随机扰动 A
+                      </button>
+                      <button
+                        onClick={() => runEigenPerturbationTest("b")}
+                        className="studio-primary-btn"
+                      >
+                        随机扰动 b
+                      </button>
+                    </div>
+
+                    {eigPerturbationResult ? (
+                      <div className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700">
+                        <div>
+                          本次扰动对象：{eigPerturbationResult.target}，ε ={" "}
+                          {eigPerturbationResult.epsilon.toExponential(0)}
+                        </div>
+                        <div>
+                          相对扰动 ||ΔA||∞ / ||A||∞ ={" "}
+                          {formatMetric(eigPerturbationResult.matrixRelativeError)}
+                        </div>
+                        <div>
+                          相对扰动 ||Δb||∞ / ||b||∞ ={" "}
+                          {formatMetric(eigPerturbationResult.vectorRelativeError)}
+                        </div>
+                        <div>
+                          特征值相对误差 max|Δλ|/max|λ| ={" "}
+                          {formatMetric(eigPerturbationResult.eigenRelativeError)}
+                        </div>
+                        <div>
+                          解向量相对误差 ||Δx||∞ / ||x||∞ ={" "}
+                          {formatMetric(eigPerturbationResult.solutionRelativeError)}
+                        </div>
+                        {eigPerturbationResult.baselineSolution &&
+                        eigPerturbationResult.perturbedSolution ? (
+                          <>
+                            <div className="pt-1 text-slate-600">
+                              原始解 x = [{eigPerturbationResult.baselineSolution.join(", ")}]
+                            </div>
+                            <div className="text-slate-600">
+                              扰动后解 x̃ = [{eigPerturbationResult.perturbedSolution.join(", ")}]
+                            </div>
+                          </>
+                        ) : (
+                          <div className="pt-1 text-amber-700">
+                            由于 A 不可逆或接近奇异，无法稳定求解 Ax=b 的误差对比。
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </aside>
               </div>
