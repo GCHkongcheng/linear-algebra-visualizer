@@ -1,6 +1,6 @@
 ﻿# Linear Algebra Studio
 
-预览网址：math.gchkc.top
+预览网址：[math.gchkc.top](https://math.gchkc.top)
 
 一个面向学习与工程实践的线性代数可视化工具。项目聚焦三件事：
 
