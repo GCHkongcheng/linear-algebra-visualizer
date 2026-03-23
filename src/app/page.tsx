@@ -18,11 +18,17 @@ import { SaveToLibraryButton } from "@/components/matrix/SaveToLibraryButton";
 import { StepCard } from "@/components/matrix/StepCard";
 import { useMatrix } from "@/hooks/useMatrix";
 import {
+  analyzeConditionNumbers,
   applyPaste,
   choleskyDecomposition,
   choleskyResidual,
   determinant,
   eigsWithMathjs,
+  perturbNumericMatrix,
+  perturbNumericVector,
+  relativeEigenError,
+  relativeMatrixErrorInfinity,
+  relativeVectorErrorInfinity,
   luDecomposition,
   luDecompositionPlain,
   luResidual,
@@ -32,6 +38,7 @@ import {
   qrOrthogonalityResidual,
   qrResidual,
   resizeInputMatrix,
+  solveNumericLinearSystem,
   toInputMatrix,
   toNumericMatrix,
 } from "@/lib/matrix-core";
@@ -57,6 +64,19 @@ type DecompositionMode = "lu" | "luPlain" | "qr" | "cholesky";
 type Feedback = {
   tone: ResultTone;
   text: string;
+};
+
+type PerturbationTarget = "A" | "b";
+
+type EigenPerturbationResult = {
+  target: PerturbationTarget;
+  epsilon: number;
+  matrixRelativeError: number | null;
+  vectorRelativeError: number | null;
+  eigenRelativeError: number | null;
+  solutionRelativeError: number | null;
+  baselineSolution: string[] | null;
+  perturbedSolution: string[] | null;
 };
 
 type DecompositionResult =
@@ -139,6 +159,14 @@ function formatSpectralRadius(value: number | null): string {
   return value.toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
+function formatMetric(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "N/A";
+  if (Math.abs(value) >= 1e4 || (Math.abs(value) > 0 && Math.abs(value) < 1e-4)) {
+    return value.toExponential(3);
+  }
+  return value.toFixed(8).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
+
 function cloneMatrixValues(matrix: string[][]): string[][] {
   return matrix.map((row) => row.map((value) => value || "0"));
 }
@@ -200,6 +228,9 @@ export default function Home() {
   );
   const [eigResult, setEigResult] = useState<EigenAnalysisResult | null>(null);
   const [eigFeedback, setEigFeedback] = useState<Feedback | null>(null);
+  const [eigVectorB, setEigVectorB] = useState<string[]>(["1", "1", "1"]);
+  const [eigPerturbationResult, setEigPerturbationResult] =
+    useState<EigenPerturbationResult | null>(null);
 
   const matrixInventory = useMatrixLibraryStore((state) => state.matrixInventory);
   const activeMatrixId = useMatrixLibraryStore((state) => state.activeMatrixId);
@@ -405,6 +436,102 @@ export default function Home() {
     }
     setEigFeedback({ tone: "success", text: "特征分析完成" });
   };
+
+  const eigenCondition = useMemo(() => {
+    const normalized = normalizeMatrixInput(eigMatrix);
+    const numeric = toNumericMatrix(normalized);
+    if (!numeric) return null;
+    return analyzeConditionNumbers(numeric);
+  }, [eigMatrix]);
+
+  const runEigenPerturbationTest = (target: PerturbationTarget) => {
+    const epsilon = 1e-6;
+    const normalizedA = normalizeMatrixInput(eigMatrix);
+    const numericA = toNumericMatrix(normalizedA);
+    if (!numericA) {
+      setEigPerturbationResult(null);
+      pushToast({
+        tone: "error",
+        title: "扰动实验",
+        message: "矩阵 A 需要纯数值输入。",
+      });
+      return;
+    }
+
+    const numericBColumn = toNumericMatrix(eigVectorB.map((value) => [value]));
+    if (!numericBColumn) {
+      setEigPerturbationResult(null);
+      pushToast({
+        tone: "error",
+        title: "扰动实验",
+        message: "向量 b 需要纯数值输入。",
+      });
+      return;
+    }
+    const numericB = numericBColumn.map((row) => row[0]);
+
+    const baselineEigen = eigsWithMathjs(numericA);
+    if (!baselineEigen) {
+      setEigPerturbationResult(null);
+      pushToast({
+        tone: "error",
+        title: "扰动实验",
+        message: "基线特征值计算失败，无法进行扰动对比。",
+      });
+      return;
+    }
+
+    const perturbedA =
+      target === "A" ? perturbNumericMatrix(numericA, epsilon) : numericA.map((row) => row.slice());
+    if (!perturbedA) {
+      setEigPerturbationResult(null);
+      pushToast({
+        tone: "error",
+        title: "扰动实验",
+        message: "矩阵扰动生成失败。",
+      });
+      return;
+    }
+
+    const perturbedB =
+      target === "b" ? perturbNumericVector(numericB, epsilon) : numericB.slice();
+    if (!perturbedB) {
+      setEigPerturbationResult(null);
+      pushToast({
+        tone: "error",
+        title: "扰动实验",
+        message: "向量扰动生成失败。",
+      });
+      return;
+    }
+
+    const perturbedEigen = eigsWithMathjs(perturbedA);
+
+    const baselineSolution = solveNumericLinearSystem(numericA, numericB);
+    const perturbedSolution = solveNumericLinearSystem(perturbedA, perturbedB);
+
+    setEigPerturbationResult({
+      target,
+      epsilon,
+      matrixRelativeError: relativeMatrixErrorInfinity(numericA, perturbedA),
+      vectorRelativeError: relativeVectorErrorInfinity(numericB, perturbedB),
+      eigenRelativeError: perturbedEigen
+        ? relativeEigenError(baselineEigen.values, perturbedEigen.values)
+        : null,
+      solutionRelativeError:
+        baselineSolution && perturbedSolution
+          ? relativeVectorErrorInfinity(baselineSolution, perturbedSolution)
+          : null,
+      baselineSolution: baselineSolution ? toInputMatrix([baselineSolution])[0] : null,
+      perturbedSolution: perturbedSolution ? toInputMatrix([perturbedSolution])[0] : null,
+    });
+
+    pushToast({
+      tone: "success",
+      title: "扰动实验",
+      message: target === "A" ? "已完成 A 的随机扰动实验。" : "已完成 b 的随机扰动实验。",
+    });
+  };
   const activeLibraryContext = useMemo<ActiveContext>(() => {
     if (activeTab === "operations") return "matrix-operations";
     if (activeTab === "system") return "linear-system";
@@ -415,6 +542,12 @@ export default function Home() {
 
   const inferMatrixKindByContext = (context: ActiveContext): MatrixKind =>
     context === "linear-system" ? "augmented" : "standard";
+
+  const resizeEigenVectorB = useCallback((nextSize: number) => {
+    setEigVectorB((prev) =>
+      Array.from({ length: nextSize }, (_, idx) => prev[idx] ?? "1")
+    );
+  }, []);
 
   const loadMatrixToOperationsA = (matrixData: string[][]) => {
     matrix.operations.setMatrixA(cloneMatrixValues(matrixData));
@@ -458,6 +591,8 @@ export default function Home() {
       const size = Math.max(copied.length, copied[0]?.length ?? 1);
       setEigSize(size);
       setEigMatrix(resizeInputMatrix(copied, size, size, "0"));
+      resizeEigenVectorB(size);
+      setEigPerturbationResult(null);
       return;
     }
 
@@ -562,6 +697,7 @@ export default function Home() {
 
   const pasteEigenMatrix = (row: number, col: number, text: string) => {
     setEigMatrix((prev) => applyPaste(prev, row, col, text));
+    setEigPerturbationResult(null);
   };
 
   const decompEvidence = useMemo(() => {
@@ -1306,6 +1442,8 @@ export default function Home() {
                             const next = Number(event.target.value);
                             setEigSize(next);
                             setEigMatrix((prev) => resizeInputMatrix(prev, next, next, "0"));
+                            resizeEigenVectorB(next);
+                            setEigPerturbationResult(null);
                           }}
                           className="studio-select"
                         >
@@ -1328,6 +1466,7 @@ export default function Home() {
                           next[r][c] = value;
                           return next;
                         });
+                        setEigPerturbationResult(null);
                       }}
                       onPasteMatrix={pasteEigenMatrix}
                     />
@@ -1371,7 +1510,127 @@ export default function Home() {
                           </div>
                         ))}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
+                        点击“计算”后，这里将显示特征值与特征向量对应关系。
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="studio-card space-y-4">
+                    <h2 className="text-lg font-semibold text-slate-900">误差分析</h2>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-800">条件数分析</div>
+                      {eigenCondition ? (
+                        <div className="mt-2 space-y-1 text-xs text-slate-600">
+                          <div>||A||₁ = {formatMetric(eigenCondition.norm1)}</div>
+                          <div>||A||∞ = {formatMetric(eigenCondition.normInf)}</div>
+                          <div>cond₁(A) = {formatMetric(eigenCondition.cond1)}</div>
+                          <div>cond∞(A) = {formatMetric(eigenCondition.condInf)}</div>
+                          {!eigenCondition.invertible ? (
+                            <div className="text-amber-700">
+                              当前矩阵不可逆，条件数视为无穷大（不稳定）。
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-xs text-slate-500">
+                          当前输入不是合法数值方阵，暂时无法计算条件数。
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="text-sm font-semibold text-slate-800">扰动实验（ε = 10^-6）</div>
+                      <p className="text-xs text-slate-600">
+                        可在 A 或 b 上施加随机微扰，比较特征值与解向量变化的相对误差。
+                      </p>
+
+                      <div>
+                        <div className="mb-2 text-xs font-semibold tracking-wide text-slate-600">
+                          线性系统向量 b（用于 Ax=b 的灵敏度对比）
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {eigVectorB.map((value, idx) => (
+                            <label
+                              key={`eig-b-${idx}`}
+                              className="flex items-center gap-2 text-xs text-slate-600"
+                            >
+                              b{idx + 1}
+                              <input
+                                value={value}
+                                onChange={(event) => {
+                                  const nextValue = event.target.value;
+                                  setEigVectorB((prev) =>
+                                    prev.map((item, itemIdx) =>
+                                      itemIdx === idx ? nextValue : item
+                                    )
+                                  );
+                                  setEigPerturbationResult(null);
+                                }}
+                                className="studio-input"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => runEigenPerturbationTest("A")}
+                          className="studio-primary-btn"
+                        >
+                          随机扰动 A
+                        </button>
+                        <button
+                          onClick={() => runEigenPerturbationTest("b")}
+                          className="studio-primary-btn"
+                        >
+                          随机扰动 b
+                        </button>
+                      </div>
+
+                      {eigPerturbationResult ? (
+                        <div className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700">
+                          <div>
+                            本次扰动对象：{eigPerturbationResult.target}，ε ={" "}
+                            {eigPerturbationResult.epsilon.toExponential(0)}
+                          </div>
+                          <div>
+                            相对扰动 ||ΔA||∞ / ||A||∞ ={" "}
+                            {formatMetric(eigPerturbationResult.matrixRelativeError)}
+                          </div>
+                          <div>
+                            相对扰动 ||Δb||∞ / ||b||∞ ={" "}
+                            {formatMetric(eigPerturbationResult.vectorRelativeError)}
+                          </div>
+                          <div>
+                            特征值相对误差 max|Δλ|/max|λ| ={" "}
+                            {formatMetric(eigPerturbationResult.eigenRelativeError)}
+                          </div>
+                          <div>
+                            解向量相对误差 ||Δx||∞ / ||x||∞ ={" "}
+                            {formatMetric(eigPerturbationResult.solutionRelativeError)}
+                          </div>
+                          {eigPerturbationResult.baselineSolution &&
+                          eigPerturbationResult.perturbedSolution ? (
+                            <>
+                              <div className="pt-1 text-slate-600">
+                                原始解 x = [{eigPerturbationResult.baselineSolution.join(", ")}]
+                              </div>
+                              <div className="text-slate-600">
+                                扰动后解 x̃ = [{eigPerturbationResult.perturbedSolution.join(", ")}]
+                              </div>
+                            </>
+                          ) : (
+                            <div className="pt-1 text-amber-700">
+                              由于 A 不可逆或接近奇异，无法稳定求解 Ax=b 的误差对比。
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </aside>
               </div>

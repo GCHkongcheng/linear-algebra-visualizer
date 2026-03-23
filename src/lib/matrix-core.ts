@@ -1650,6 +1650,262 @@ function invertNumericMatrix(matrix: number[][]): number[][] | null {
   );
 }
 
+function isValidNumericMatrix(matrix: number[][]): boolean {
+  if (!Array.isArray(matrix) || matrix.length === 0) return false;
+  const cols = matrix[0]?.length ?? 0;
+  if (cols === 0) return false;
+  return matrix.every(
+    (row) =>
+      Array.isArray(row) &&
+      row.length === cols &&
+      row.every((value) => typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+function matrixOneNormInternal(matrix: number[][]): number {
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  let maxColumnSum = 0;
+
+  for (let c = 0; c < cols; c += 1) {
+    let sum = 0;
+    for (let r = 0; r < rows; r += 1) {
+      sum += Math.abs(matrix[r][c]);
+    }
+    if (sum > maxColumnSum) {
+      maxColumnSum = sum;
+    }
+  }
+
+  return maxColumnSum;
+}
+
+function matrixInfinityNormInternal(matrix: number[][]): number {
+  let maxRowSum = 0;
+
+  for (const row of matrix) {
+    const rowSum = row.reduce((sum, value) => sum + Math.abs(value), 0);
+    if (rowSum > maxRowSum) {
+      maxRowSum = rowSum;
+    }
+  }
+
+  return maxRowSum;
+}
+
+function maxAbsVectorNorm(vector: number[]): number {
+  return vector.reduce((maxAbs, value) => Math.max(maxAbs, Math.abs(value)), 0);
+}
+
+function safeRelativeError(deltaNorm: number, baseNorm: number): number {
+  const denominator = Math.max(baseNorm, EPS);
+  return deltaNorm / denominator;
+}
+
+export function matrixOneNorm(matrix: number[][]): number | null {
+  if (!isValidNumericMatrix(matrix)) return null;
+  return normalizeNearZero(matrixOneNormInternal(matrix));
+}
+
+export function matrixInfinityNorm(matrix: number[][]): number | null {
+  if (!isValidNumericMatrix(matrix)) return null;
+  return normalizeNearZero(matrixInfinityNormInternal(matrix));
+}
+
+export function analyzeConditionNumbers(matrix: number[][]): {
+  norm1: number;
+  normInf: number;
+  inverseNorm1: number | null;
+  inverseNormInf: number | null;
+  cond1: number | null;
+  condInf: number | null;
+  invertible: boolean;
+} | null {
+  if (!isValidNumericMatrix(matrix)) return null;
+  if (matrix.length !== matrix[0].length) return null;
+
+  const norm1 = matrixOneNormInternal(matrix);
+  const normInf = matrixInfinityNormInternal(matrix);
+  const inverse = invertNumericMatrix(matrix);
+
+  if (!inverse) {
+    return {
+      norm1: normalizeNearZero(norm1),
+      normInf: normalizeNearZero(normInf),
+      inverseNorm1: null,
+      inverseNormInf: null,
+      cond1: null,
+      condInf: null,
+      invertible: false,
+    };
+  }
+
+  const inverseNorm1 = matrixOneNormInternal(inverse);
+  const inverseNormInf = matrixInfinityNormInternal(inverse);
+  const cond1Raw = norm1 * inverseNorm1;
+  const condInfRaw = normInf * inverseNormInf;
+
+  return {
+    norm1: normalizeNearZero(norm1),
+    normInf: normalizeNearZero(normInf),
+    inverseNorm1: normalizeNearZero(inverseNorm1),
+    inverseNormInf: normalizeNearZero(inverseNormInf),
+    cond1: Number.isFinite(cond1Raw) ? normalizeNearZero(cond1Raw) : null,
+    condInf: Number.isFinite(condInfRaw) ? normalizeNearZero(condInfRaw) : null,
+    invertible: true,
+  };
+}
+
+export function perturbNumericMatrix(
+  matrix: number[][],
+  epsilon = 1e-6
+): number[][] | null {
+  if (!isValidNumericMatrix(matrix)) return null;
+  return matrix.map((row) =>
+    row.map((value) => normalizeNearZero(value + (Math.random() * 2 - 1) * epsilon))
+  );
+}
+
+export function perturbNumericVector(
+  vector: number[],
+  epsilon = 1e-6
+): number[] | null {
+  if (!Array.isArray(vector) || vector.length === 0) return null;
+  if (vector.some((value) => typeof value !== "number" || !Number.isFinite(value))) return null;
+  return vector.map((value) => normalizeNearZero(value + (Math.random() * 2 - 1) * epsilon));
+}
+
+export function relativeMatrixErrorInfinity(
+  baseline: number[][],
+  candidate: number[][]
+): number | null {
+  if (!isValidNumericMatrix(baseline) || !isValidNumericMatrix(candidate)) return null;
+  if (
+    baseline.length !== candidate.length ||
+    baseline[0].length !== candidate[0].length
+  ) {
+    return null;
+  }
+
+  let deltaNorm = 0;
+  for (let r = 0; r < baseline.length; r += 1) {
+    let rowSum = 0;
+    for (let c = 0; c < baseline[0].length; c += 1) {
+      rowSum += Math.abs(candidate[r][c] - baseline[r][c]);
+    }
+    if (rowSum > deltaNorm) {
+      deltaNorm = rowSum;
+    }
+  }
+
+  const baseNorm = matrixInfinityNormInternal(baseline);
+  return normalizeNearZero(safeRelativeError(deltaNorm, baseNorm));
+}
+
+export function relativeVectorErrorInfinity(
+  baseline: number[],
+  candidate: number[]
+): number | null {
+  if (!Array.isArray(baseline) || !Array.isArray(candidate)) return null;
+  if (!baseline.length || baseline.length !== candidate.length) return null;
+  if (
+    baseline.some((value) => typeof value !== "number" || !Number.isFinite(value)) ||
+    candidate.some((value) => typeof value !== "number" || !Number.isFinite(value))
+  ) {
+    return null;
+  }
+
+  const delta = baseline.map((value, idx) => candidate[idx] - value);
+  const deltaNorm = maxAbsVectorNorm(delta);
+  const baseNorm = maxAbsVectorNorm(baseline);
+  return normalizeNearZero(safeRelativeError(deltaNorm, baseNorm));
+}
+
+export function solveNumericLinearSystem(
+  matrixA: number[][],
+  vectorB: number[]
+): number[] | null {
+  if (!isValidNumericMatrix(matrixA)) return null;
+  const n = matrixA.length;
+  if (matrixA[0].length !== n) return null;
+  if (!Array.isArray(vectorB) || vectorB.length !== n) return null;
+  if (vectorB.some((value) => typeof value !== "number" || !Number.isFinite(value))) return null;
+
+  const augmented = matrixA.map((row, idx) => [...row, vectorB[idx]]);
+
+  for (let col = 0; col < n; col += 1) {
+    let pivotRow = col;
+    let maxAbs = Math.abs(augmented[col][col]);
+    for (let row = col + 1; row < n; row += 1) {
+      const abs = Math.abs(augmented[row][col]);
+      if (abs > maxAbs) {
+        maxAbs = abs;
+        pivotRow = row;
+      }
+    }
+
+    if (maxAbs < EPS) return null;
+
+    if (pivotRow !== col) {
+      [augmented[col], augmented[pivotRow]] = [augmented[pivotRow], augmented[col]];
+    }
+
+    for (let row = col + 1; row < n; row += 1) {
+      const factor = augmented[row][col] / augmented[col][col];
+      if (Math.abs(factor) < EPS) continue;
+      for (let c = col; c <= n; c += 1) {
+        augmented[row][c] -= factor * augmented[col][c];
+      }
+    }
+  }
+
+  const x = Array.from({ length: n }, () => 0);
+  for (let row = n - 1; row >= 0; row -= 1) {
+    let sum = augmented[row][n];
+    for (let c = row + 1; c < n; c += 1) {
+      sum -= augmented[row][c] * x[c];
+    }
+
+    const pivot = augmented[row][row];
+    if (Math.abs(pivot) < EPS) return null;
+    x[row] = normalizeNearZero(sum / pivot);
+  }
+
+  return x;
+}
+
+function sortEigenComponents(components: EigenComponent[]): EigenComponent[] {
+  return [...components].sort((left, right) => {
+    const a = toComplexParts(left);
+    const b = toComplexParts(right);
+    if (Math.abs(a.re - b.re) > 1e-8) return a.re - b.re;
+    return a.im - b.im;
+  });
+}
+
+export function relativeEigenError(
+  baseline: EigenComponent[],
+  candidate: EigenComponent[]
+): number | null {
+  if (!baseline.length || baseline.length !== candidate.length) return null;
+
+  const left = sortEigenComponents(baseline);
+  const right = sortEigenComponents(candidate);
+
+  let maxDiff = 0;
+  let baseMagnitude = 0;
+
+  for (let i = 0; i < left.length; i += 1) {
+    const a = toComplexParts(left[i]);
+    const b = toComplexParts(right[i]);
+    const diff = Math.hypot(a.re - b.re, a.im - b.im);
+    maxDiff = Math.max(maxDiff, diff);
+    baseMagnitude = Math.max(baseMagnitude, componentMagnitude(left[i]));
+  }
+
+  return normalizeNearZero(maxDiff / Math.max(baseMagnitude, EPS));
+}
+
 type IterativeConvergenceInfo = {
   spectralRadius: number | null;
   convergenceGuaranteed: boolean | null;

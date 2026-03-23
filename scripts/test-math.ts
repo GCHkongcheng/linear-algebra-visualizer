@@ -1,6 +1,7 @@
 ﻿import assert from "node:assert/strict";
 
 import {
+  analyzeConditionNumbers,
   eigsWithMathjs,
   choleskyDecomposition,
   choleskyResidual,
@@ -8,11 +9,17 @@ import {
   luResidual,
   maxAbsAxMinusB,
   numericValue,
+  perturbNumericMatrix,
+  perturbNumericVector,
   qrDecomposition,
   qrOrthogonalityResidual,
   qrResidual,
+  relativeEigenError,
+  relativeMatrixErrorInfinity,
+  relativeVectorErrorInfinity,
   solveLinearSystemIterative,
   solveLinearSystemWithSteps,
+  solveNumericLinearSystem,
 } from "../src/lib/matrix-core";
 import type { EigenComponent } from "../src/types/matrix";
 
@@ -399,6 +406,77 @@ function testConjugateGradientRejectsNonSpd() {
   assert.ok(result.note, "? SPD ???????");
 }
 
+function testConditionNumberAnalysis() {
+  const matrix = [
+    [4, 1],
+    [2, 3],
+  ];
+
+  const analysis = analyzeConditionNumbers(matrix);
+  assert.ok(analysis, "条件数分析应返回结果");
+  assert.equal(analysis.invertible, true, "该矩阵应可逆");
+  assert.ok(analysis.cond1 !== null, "cond1 应可计算");
+  assert.ok(analysis.condInf !== null, "condInf 应可计算");
+  assert.ok(Math.abs((analysis.cond1 ?? 0) - 3) < 1e-8, "cond1 应接近 3");
+  assert.ok(Math.abs((analysis.condInf ?? 0) - 3) < 1e-8, "condInf 应接近 3");
+
+  const singular = analyzeConditionNumbers([
+    [1, 2],
+    [2, 4],
+  ]);
+  assert.ok(singular, "奇异矩阵也应返回基础范数信息");
+  assert.equal(singular.invertible, false, "奇异矩阵应标记为不可逆");
+  assert.equal(singular.cond1, null, "奇异矩阵 cond1 应为空");
+  assert.equal(singular.condInf, null, "奇异矩阵 condInf 应为空");
+}
+
+function testPerturbationAndRelativeErrors() {
+  const matrix = [
+    [3, 1],
+    [1, 2],
+  ];
+  const vector = [5, 5];
+
+  const perturbedMatrix = perturbNumericMatrix(matrix, 1e-6);
+  assert.ok(perturbedMatrix, "矩阵扰动应成功");
+  const matrixError = relativeMatrixErrorInfinity(matrix, perturbedMatrix);
+  assert.ok(matrixError !== null, "矩阵相对误差应可计算");
+  assert.ok(matrixError >= 0, "矩阵相对误差应非负");
+
+  const perturbedVector = perturbNumericVector(vector, 1e-6);
+  assert.ok(perturbedVector, "向量扰动应成功");
+  const vectorError = relativeVectorErrorInfinity(vector, perturbedVector);
+  assert.ok(vectorError !== null, "向量相对误差应可计算");
+  assert.ok(vectorError >= 0, "向量相对误差应非负");
+}
+
+function testSolveNumericLinearSystemAndEigenRelativeError() {
+  const matrix = [
+    [4, 1],
+    [1, 3],
+  ];
+  const vector = [1, 2];
+
+  const solution = solveNumericLinearSystem(matrix, vector);
+  assert.ok(solution, "数值线性系统应可求解");
+  assert.ok(Math.abs(solution[0] - 1 / 11) < 1e-8, "x1 应接近 1/11");
+  assert.ok(Math.abs(solution[1] - 7 / 11) < 1e-8, "x2 应接近 7/11");
+
+  const eigenError = relativeEigenError(
+    [
+      { re: 1, im: 2 },
+      { re: 3, im: 0 },
+    ],
+    [
+      { re: 1.000001, im: 1.999999 },
+      { re: 2.999999, im: 0.000001 },
+    ]
+  );
+  assert.ok(eigenError !== null, "特征值相对误差应可计算");
+  assert.ok(eigenError > 0, "特征值相对误差应大于 0");
+  assert.ok(eigenError < 1e-4, "特征值相对误差应保持在小扰动量级");
+}
+
 function run() {
   testEigenRealPairing();
   testEigenComplexSupport();
@@ -413,6 +491,9 @@ function run() {
   testSorIterationConvergence();
   testConjugateGradientConvergence();
   testConjugateGradientRejectsNonSpd();
+  testConditionNumberAnalysis();
+  testPerturbationAndRelativeErrors();
+  testSolveNumericLinearSystemAndEigenRelativeError();
 
   console.log("[test:math] 所有回归测试通过");
 }
