@@ -792,6 +792,49 @@ export function luDecomposition(matrix: string[][]): LUResult | null {
   return { L, U, P };
 }
 
+
+
+export function luDecompositionPlain(matrix: string[][]): LUResult | null {
+  const size = matrix.length;
+  if (size === 0 || matrix[0].length !== size) return null;
+
+  const A: string[][] = cloneMatrix(matrix).map((row) =>
+    row.map((value) => simplifyExpr(value))
+  );
+
+  const L: string[][] = Array.from({ length: size }, (_, r) =>
+    Array.from({ length: size }, (_, c) => (r === c ? "1" : "0"))
+  );
+  const U: string[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => "0")
+  );
+  const P: string[][] = Array.from({ length: size }, (_, r) =>
+    Array.from({ length: size }, (_, c) => (r === c ? "1" : "0"))
+  );
+
+  for (let k = 0; k < size; k += 1) {
+    for (let j = k; j < size; j += 1) {
+      let sum = "0";
+      for (let s = 0; s < k; s += 1) {
+        sum = addExpr(sum, mulExpr(L[k][s], U[s][j]));
+      }
+      U[k][j] = subExpr(A[k][j], sum);
+    }
+
+    if (isZeroExpr(U[k][k])) return null;
+
+    for (let i = k + 1; i < size; i += 1) {
+      let sum = "0";
+      for (let s = 0; s < k; s += 1) {
+        sum = addExpr(sum, mulExpr(L[i][s], U[s][k]));
+      }
+      L[i][k] = divExpr(subExpr(A[i][k], sum), U[k][k]);
+    }
+  }
+
+  return { L, U, P };
+}
+
 function toPlainArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (value && typeof value === "object" && "valueOf" in value) {
@@ -1078,6 +1121,21 @@ export function luResidual(input: string[][], lu: LUResult): number | null {
   if (!pa || !luProduct) return null;
 
   return maxAbsMatrixDiff(pa, luProduct);
+}
+
+
+
+export function luResidualPlain(input: string[][], lu: LUResult): number | null {
+  const a = toNumericMatrix(input);
+  const l = toNumericMatrix(lu.L);
+  const u = toNumericMatrix(lu.U);
+
+  if (!a || !l || !u) return null;
+
+  const luProduct = multiplyNumericMatrices(l, u);
+  if (!luProduct) return null;
+
+  return maxAbsMatrixDiff(a, luProduct);
 }
 
 export function maxAbsAxMinusB(

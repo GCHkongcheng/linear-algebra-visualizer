@@ -24,7 +24,9 @@ import {
   determinant,
   eigsWithMathjs,
   luDecomposition,
+  luDecompositionPlain,
   luResidual,
+  luResidualPlain,
   normalizeMatrixInput,
   qrDecomposition,
   qrOrthogonalityResidual,
@@ -50,7 +52,7 @@ import {
 } from "@/store/matrix-library";
 
 type TabId = "operations" | "system" | "determinant" | "decomposition" | "eigen";
-type DecompositionMode = "lu" | "qr" | "cholesky";
+type DecompositionMode = "lu" | "luPlain" | "qr" | "cholesky";
 
 type Feedback = {
   tone: ResultTone;
@@ -59,7 +61,7 @@ type Feedback = {
 
 type DecompositionResult =
   | {
-      mode: "lu";
+      mode: "lu" | "luPlain";
       decomposition: LUResult;
       residual: number | null;
       threshold: number;
@@ -104,6 +106,7 @@ const DEFAULT_SQUARE = toInputMatrix([
 
 const DECOMPOSITION_OPTIONS: Array<{ id: DecompositionMode; label: string }> = [
   { id: "lu", label: "LU（带主元）" },
+  { id: "luPlain", label: "LU（普通）" },
   { id: "qr", label: "QR（Householder）" },
   { id: "cholesky", label: "Cholesky分解" },
 ];
@@ -310,17 +313,36 @@ export default function Home() {
       return;
     }
 
-    if (decompMode === "lu") {
-      const decomposition = luDecomposition(normalized);
+    if (decompMode === "lu" || decompMode === "luPlain") {
+      const isPlainLu = decompMode === "luPlain";
+      const decomposition = isPlainLu
+        ? luDecompositionPlain(normalized)
+        : luDecomposition(normalized);
       if (!decomposition) {
         setDecompResult(null);
-        setDecompFeedback({ tone: "error", text: "LU 分解失败" });
+        setDecompFeedback({
+          tone: "error",
+          text: isPlainLu
+            ? "普通 LU 分解失败（主对角线出现零主元，建议改用带主元 LU）"
+            : "LU 分解失败",
+        });
         return;
       }
-      const residual = luResidual(normalized, decomposition);
+      const residual = isPlainLu
+        ? luResidualPlain(normalized, decomposition)
+        : luResidual(normalized, decomposition);
       const passed = residual === null ? null : residual < RESIDUAL_THRESHOLD;
-      setDecompResult({ mode: "lu", decomposition, residual, threshold: RESIDUAL_THRESHOLD, passed });
-      setDecompFeedback({ tone: passed === false ? "warning" : "success", text: "LU 分解完成" });
+      setDecompResult({
+        mode: isPlainLu ? "luPlain" : "lu",
+        decomposition,
+        residual,
+        threshold: RESIDUAL_THRESHOLD,
+        passed,
+      });
+      setDecompFeedback({
+        tone: passed === false ? "warning" : "success",
+        text: isPlainLu ? "普通 LU 分解完成" : "LU 分解完成",
+      });
       return;
     }
 
@@ -544,7 +566,10 @@ export default function Home() {
 
   const decompEvidence = useMemo(() => {
     if (!decompResult) return undefined;
-    if (decompResult.mode === "lu") {
+    if (decompResult.mode === "lu" || decompResult.mode === "luPlain") {
+      if (decompResult.mode === "luPlain") {
+        return `A=L*U, maxAbs(A-LU)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
+      }
       return `P*A = L*U, maxAbs(PA-LU)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
     }
     if (decompResult.mode === "qr") {
@@ -561,7 +586,9 @@ export default function Home() {
     matrix.system.currentStep?.matrix ?? matrix.system.augmented;
   const decompPrimaryMatrix = useMemo(() => {
     if (!decompResult) return null;
-    if (decompResult.mode === "lu") return decompResult.decomposition.L;
+    if (decompResult.mode === "lu" || decompResult.mode === "luPlain") {
+      return decompResult.decomposition.L;
+    }
     if (decompResult.mode === "qr") return decompResult.decomposition.Q;
     return decompResult.decomposition.L;
   }, [decompResult]);
@@ -1197,26 +1224,66 @@ export default function Home() {
                       />
                     </div>
 
-                    {decompResult?.mode === "lu" ? (
+                    {decompResult?.mode === "lu" || decompResult?.mode === "luPlain" ? (
                       <>
-                        <MatrixGrid matrix={decompResult.decomposition.L} displayMode={matrix.displayMode} />
-                        <MatrixGrid matrix={decompResult.decomposition.U} displayMode={matrix.displayMode} />
-                        <MatrixGrid matrix={decompResult.decomposition.P} displayMode={matrix.displayMode} />
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                          {decompResult.mode === "lu"
+                            ? "LU 分解关系：P·A = L·U"
+                            : "普通 LU 分解关系：A = L·U"}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">L（下三角矩阵）</div>
+                          <MatrixGrid matrix={decompResult.decomposition.L} displayMode={matrix.displayMode} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">U（上三角矩阵）</div>
+                          <MatrixGrid matrix={decompResult.decomposition.U} displayMode={matrix.displayMode} />
+                        </div>
+                        {decompResult.mode === "lu" ? (
+                          <div className="space-y-2">
+                            <div className="text-xs font-semibold tracking-wide text-slate-600">P（置换矩阵）</div>
+                            <MatrixGrid matrix={decompResult.decomposition.P} displayMode={matrix.displayMode} />
+                          </div>
+                        ) : null}
                       </>
                     ) : null}
 
                     {decompResult?.mode === "qr" ? (
                       <>
-                        <MatrixGrid matrix={decompResult.decomposition.Q} displayMode={matrix.displayMode} />
-                        <MatrixGrid matrix={decompResult.decomposition.R} displayMode={matrix.displayMode} />
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                          QR 分解关系：A = Q·R
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">Q（正交矩阵）</div>
+                          <MatrixGrid matrix={decompResult.decomposition.Q} displayMode={matrix.displayMode} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">R（上三角矩阵）</div>
+                          <MatrixGrid matrix={decompResult.decomposition.R} displayMode={matrix.displayMode} />
+                        </div>
                       </>
                     ) : null}
 
                     {decompResult?.mode === "cholesky" ? (
                       <>
-                        <MatrixGrid matrix={decompResult.decomposition.L} displayMode={matrix.displayMode} />
-                        <MatrixGrid matrix={decompResult.decomposition.Lt} displayMode={matrix.displayMode} />
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                          Cholesky 分解关系：A = L·L^T
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">L（下三角矩阵）</div>
+                          <MatrixGrid matrix={decompResult.decomposition.L} displayMode={matrix.displayMode} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">L^T（L 的转置）</div>
+                          <MatrixGrid matrix={decompResult.decomposition.Lt} displayMode={matrix.displayMode} />
+                        </div>
                       </>
+                    ) : null}
+
+                    {!decompResult ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
+                        点击“计算”后，这里将显示分解结果矩阵。
+                      </div>
                     ) : null}
                   </div>
                 </aside>
