@@ -9,7 +9,7 @@ import { getSiteUrl, siteConfig } from "@/lib/site";
 
 const GITHUB_REPO = siteConfig.githubRepo;
 const CONTACT_EMAIL = siteConfig.contactEmail;
-const BLOG_URL = "https://blog.gchkc.top";
+const BLOG_URL = "https://283947.xyz/posts/linear-algebra-workbench";
 const README_PATH = path.join(process.cwd(), "README.md");
 const CHANGELOG_PATH = path.join(process.cwd(), "CHANGELOG.md");
 
@@ -33,7 +33,7 @@ const copy = {
     "\u9879\u76ee\u6301\u7eed\u4ee5\u201c\u8ba1\u7b97\u6b63\u786e\u6027 + \u53ef\u89e3\u91ca\u6027\u201d\u4e3a\u7b2c\u4e00\u4f18\u5148\u7ea7\u3002\u5982\u679c\u4f60\u53d1\u73b0\u7ed3\u679c\u5f02\u5e38\u6216\u5e0c\u671b\u65b0\u589e\u529f\u80fd\uff0c\u6b22\u8fce\u901a\u8fc7\u4e0b\u65b9\u8054\u7cfb\u65b9\u5f0f\u53cd\u9988\u3002\u53e6\u5916\uff0c\u5982\u679c\u4f60\u559c\u6b22\u8fd9\u4e2a\u9879\u76ee\uff0c\u8bf7\u70b9\u4e00\u4e2astar~",
   blogPrefix:
     "\u66f4\u591a\u54a8\u8be2\u8bf7\u5173\u6ce8\u6211\u7684\u535a\u5ba2\uff08\u94fe\u63a5",
-  blogLabel: "blog.gchkc.top",
+  blogLabel: "283947.xyz",
   blogSuffix: "\uff09\u3002",
   docsLabel: "\u8bf4\u660e\u6587\u6863",
   changelogLabel: "\u66f4\u65b0\u65e5\u5fd7",
