@@ -89,6 +89,12 @@ body {
   color: white;
 }
 
+.nav-tab-active:hover {
+  border-color: rgb(15 23 42 / 0.82);
+  background: rgb(15 23 42);
+  color: white;
+}
+
 .mode-chip {
   border-radius: 9999px;
   border: 1px solid rgb(15 23 42 / 0.14);
@@ -100,6 +106,12 @@ body {
 }
 
 .mode-chip-active {
+  border-color: rgb(15 23 42);
+  background: rgb(15 23 42);
+  color: white;
+}
+
+.mode-chip-active:hover {
   border-color: rgb(15 23 42);
   background: rgb(15 23 42);
   color: white;
@@ -130,6 +142,13 @@ body {
 }
 
 .operation-pill-active {
+  border-color: transparent;
+  background: rgb(15 23 42);
+  color: white;
+}
+
+.operation-pill-active:hover {
+  border-color: transparent;
   background: rgb(15 23 42);
   color: white;
 }

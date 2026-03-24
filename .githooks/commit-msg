@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+node scripts/update-changelog-on-commit.mjs "$1"

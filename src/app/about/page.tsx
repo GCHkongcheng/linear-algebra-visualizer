@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ArrowLeft, ExternalLink, Github, Mail } from "lucide-react";
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     canonical: "/about",
   },
   openGraph: {
-    title: `${copy.title} | Linear Algebra Studio`,
+    title: `${copy.title} | 线性代数工作台`,
     description: copy.shareDesc,
     url: `${getSiteUrl()}/about`,
     siteName: siteConfig.name,
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${copy.title} | Linear Algebra Studio`,
+    title: `${copy.title} | 线性代数工作台`,
     description: copy.shareDesc,
   },
 };
@@ -98,7 +98,7 @@ export default async function AboutPage() {
         </header>
 
         <article className="prose prose-slate max-w-none rounded-3xl border border-slate-200 bg-white/90 px-6 py-7 shadow-sm">
-          <h1>Linear Algebra Studio</h1>
+          <h1>线性代数工作台</h1>
 
           <h2>{copy.sectionOrigin}</h2>
           <p>{copy.paragraphOrigin}</p>

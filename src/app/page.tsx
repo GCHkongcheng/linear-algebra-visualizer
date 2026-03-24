@@ -1317,11 +1317,21 @@ export default function Home() {
                         <label className="flex items-center gap-1">列数
                           <select
                             value={decompCols}
-                            disabled={decompMode !== "qr"}
                             onChange={(event) => {
                               const nextCols = Number(event.target.value);
+                              if (decompMode === "qr") {
+                                setDecompCols(nextCols);
+                                setDecompMatrix((prev) =>
+                                  resizeInputMatrix(prev, decompRows, nextCols, "0")
+                                );
+                                return;
+                              }
+                              // 方阵分解模式下，列数与行数保持同步，保证始终是方阵输入。
+                              setDecompRows(nextCols);
                               setDecompCols(nextCols);
-                              setDecompMatrix((prev) => resizeInputMatrix(prev, decompRows, nextCols, "0"));
+                              setDecompMatrix((prev) =>
+                                resizeInputMatrix(prev, nextCols, nextCols, "0")
+                              );
                             }}
                             className="studio-select"
                           >

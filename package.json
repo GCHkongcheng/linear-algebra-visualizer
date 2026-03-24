@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:math": "node scripts/run-math-tests.mjs"
+    "test:math": "node scripts/run-math-tests.mjs",
+    "setup:hooks": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
