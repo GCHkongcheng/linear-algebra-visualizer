@@ -13,6 +13,10 @@
 
 - 文档弹窗从纯文本展示升级为 Markdown 渲染，支持标题、列表、表格等常见语法。
 
+### Commit Audit
+- 2026-03-24 21:13:49 | 提交：Enable Codex-powered changelog updates on commit
+  - 文件审查：修改 2
+  - 变更范围：`README.md`、`scripts/update-changelog-on-commit.mjs`
 ## [0.1.0] - 2026-03-23
 
 ### Added
