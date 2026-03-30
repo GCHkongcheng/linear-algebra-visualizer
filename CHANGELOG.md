@@ -14,6 +14,10 @@
 - 文档弹窗从纯文本展示升级为 Markdown 渲染，支持标题、列表、表格等常见语法。
 
 ### Commit Audit
+- 2026-03-30 18:22:25 | 提交：增加显示正确性证据功能
+  - 文件审查：新增 1，修改 2
+  - 变更范围：`README.md`、`src/app/page.tsx`、`src/components/matrix/CorrectnessPanel.tsx`
+  - 风险提示：涉及前端交互，建议人工回归关键页面
 - 2026-03-24 21:13:49 | 提交：Enable Codex-powered changelog updates on commit
   - 文件审查：修改 2
   - 变更范围：`README.md`、`scripts/update-changelog-on-commit.mjs`
