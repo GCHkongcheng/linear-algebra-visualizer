@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { CorrectnessPanel } from "@/components/matrix/CorrectnessPanel";
 import { MatrixGrid } from "@/components/matrix/MatrixGrid";
 import { MatrixShelf } from "@/components/matrix/MatrixShelf";
 import { OperationButtonGroup } from "@/components/matrix/OperationButtonGroup";
@@ -35,6 +36,7 @@ import {
   luResidual,
   luResidualPlain,
   normalizeMatrixInput,
+  numericValue,
   qrDecomposition,
   qrOrthogonalityResidual,
   qrResidual,
@@ -174,6 +176,41 @@ function formatMetric(value: number | null): string {
   return value.toFixed(8).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
+
+type CorrectnessDescriptor = {
+  title: string;
+  equation?: string;
+  residual?: number | null;
+  threshold?: number | null;
+  passed?: boolean | null;
+  note?: string;
+  metrics?: Array<{ label: string; value: string }>;
+};
+
+function computeAxMinusBResidual(
+  matrixA: number[][],
+  vectorX: number[],
+  vectorB: number[]
+): number | null {
+  if (!matrixA.length || !vectorX.length || matrixA.length !== vectorB.length) {
+    return null;
+  }
+
+  let maxResidual = 0;
+
+  for (let row = 0; row < matrixA.length; row += 1) {
+    if (matrixA[row].length !== vectorX.length) return null;
+
+    let sum = 0;
+    for (let col = 0; col < vectorX.length; col += 1) {
+      sum += matrixA[row][col] * vectorX[col];
+    }
+    const residual = Math.abs(sum - vectorB[row]);
+    if (residual > maxResidual) maxResidual = residual;
+  }
+
+  return maxResidual;
+}
 function cloneMatrixValues(matrix: string[][]): string[][] {
   return matrix.map((row) => row.map((value) => value || "0"));
 }
@@ -209,9 +246,41 @@ function DisplayModeSwitcher({
   );
 }
 
+function CorrectnessPanelToggleCard({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-medium text-slate-700">正确性证据</div>
+      <button
+        type="button"
+        onClick={() => onToggle(!enabled)}
+        aria-pressed={enabled}
+        aria-label={enabled ? "关闭正确性证据面板" : "开启正确性证据面板"}
+        className={`relative h-6 w-11 rounded-full transition ${
+          enabled ? "bg-emerald-500" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+            enabled ? "left-5" : "left-0.5"
+          }`}
+        />
+      </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const matrix = useMatrix();
   const [activeTab, setActiveTab] = useState<TabId>("operations");
+  const [showCorrectnessPanel, setShowCorrectnessPanel] = useState(false);
 
   const [detSize, setDetSize] = useState(3);
   const [detMatrix, setDetMatrix] = useState<string[][]>(
@@ -737,6 +806,239 @@ export default function Home() {
     if (decompResult.mode === "qr") return decompResult.decomposition.Q;
     return decompResult.decomposition.L;
   }, [decompResult]);
+  const operationCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
+    if (!matrix.operations.feedback) return null;
+
+    const operation = matrix.operations.operation;
+    if (operation === "rank" || operation === "determinant") {
+      return {
+        title: "运算正确性证据",
+        equation: matrix.operations.feedback.text,
+        passed: matrix.operations.feedback.tone === "success",
+        note: "该结果由分数/符号链路直接计算得到。",
+      };
+    }
+
+    if (operation === "inverse" && matrix.operations.resultMatrix) {
+      const matrixA = toNumericMatrix(normalizeMatrixInput(matrix.operations.matrixA));
+      const inverseA = toNumericMatrix(normalizeMatrixInput(matrix.operations.resultMatrix));
+
+      if (!matrixA || !inverseA) {
+        return {
+          title: "运算正确性证据",
+          equation: "A · A^-1 = I",
+          passed: null,
+          note: "当前输入包含非纯数值表达，无法计算数值残差。",
+        };
+      }
+
+      const size = matrixA.length;
+      if (
+        !size ||
+        matrixA.some((row) => row.length !== size) ||
+        inverseA.some((row) => row.length !== size)
+      ) {
+        return null;
+      }
+
+      let maxResidual = 0;
+      for (let r = 0; r < size; r += 1) {
+        for (let c = 0; c < size; c += 1) {
+          let sum = 0;
+          for (let k = 0; k < size; k += 1) {
+            sum += matrixA[r][k] * inverseA[k][c];
+          }
+          const expected = r === c ? 1 : 0;
+          const residual = Math.abs(sum - expected);
+          if (residual > maxResidual) maxResidual = residual;
+        }
+      }
+
+      return {
+        title: "运算正确性证据",
+        equation: "A · A^-1 = I",
+        residual: maxResidual,
+        threshold: RESIDUAL_THRESHOLD,
+        passed: maxResidual < RESIDUAL_THRESHOLD,
+      };
+    }
+
+    return null;
+  }, [
+    matrix.operations.feedback,
+    matrix.operations.matrixA,
+    matrix.operations.operation,
+    matrix.operations.resultMatrix,
+  ]);
+
+  const systemCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
+    const summary = matrix.system.summary;
+    if (!summary) return null;
+
+    const baseMetrics = [
+      { label: "rank(A)", value: `${summary.rankA}` },
+      { label: "rank([A|b])", value: `${summary.rankAug}` },
+    ];
+
+    if (matrix.system.iterativeResult) {
+      const tolerance = Number(matrix.system.tolerance);
+      const threshold =
+        Number.isFinite(tolerance) && tolerance > 0 ? tolerance : RESIDUAL_THRESHOLD;
+      const iterative = matrix.system.iterativeResult;
+      return {
+        title: "求解正确性证据",
+        equation: "maxAbs(Ax-b)",
+        residual: iterative.residual,
+        threshold,
+        passed: iterative.converged || iterative.residual < threshold,
+        metrics: [
+          ...baseMetrics,
+          { label: "迭代次数", value: `${iterative.iterations}` },
+          { label: "ρ(B)", value: formatSpectralRadius(iterative.spectralRadius) },
+        ],
+        note: iterative.convergenceMessage,
+      };
+    }
+
+    const variableCount = matrix.system.cols;
+
+    if (summary.rankAug > summary.rankA) {
+      return {
+        title: "求解正确性证据",
+        equation: "rank([A|b]) > rank(A)",
+        passed: true,
+        metrics: baseMetrics,
+        note: "秩判定满足无解条件。",
+      };
+    }
+
+    if (summary.rankA < variableCount) {
+      return {
+        title: "求解正确性证据",
+        equation: "rank([A|b]) = rank(A) < n",
+        passed: true,
+        metrics: [
+          ...baseMetrics,
+          { label: "变量数 n", value: `${variableCount}` },
+        ],
+        note: "秩判定满足无穷多解条件。",
+      };
+    }
+
+    if (!summary.solution || summary.solution.length !== variableCount) {
+      return {
+        title: "求解正确性证据",
+        equation: "maxAbs(Ax-b)",
+        passed: null,
+        metrics: baseMetrics,
+        note: "当前无法构造完整的数值解向量。",
+      };
+    }
+
+    const matrixA = toNumericMatrix(normalizeMatrixInput(matrix.system.matrixA));
+    const vectorBMatrix = toNumericMatrix(normalizeMatrixInput(matrix.system.vectorB));
+    const vectorX = summary.solution.map((value) => numericValue(value));
+
+    if (!matrixA || !vectorBMatrix || vectorX.some((value) => value === null)) {
+      return {
+        title: "求解正确性证据",
+        equation: "maxAbs(Ax-b)",
+        passed: null,
+        metrics: baseMetrics,
+        note: "当前输入包含非纯数值表达，无法计算数值残差。",
+      };
+    }
+
+    const residual = computeAxMinusBResidual(
+      matrixA,
+      vectorX as number[],
+      vectorBMatrix.map((row) => row[0])
+    );
+
+    return {
+      title: "求解正确性证据",
+      equation: "maxAbs(Ax-b)",
+      residual,
+      threshold: RESIDUAL_THRESHOLD,
+      passed: residual !== null ? residual < RESIDUAL_THRESHOLD : null,
+      metrics: baseMetrics,
+    };
+  }, [
+    matrix.system.cols,
+    matrix.system.iterativeResult,
+    matrix.system.matrixA,
+    matrix.system.summary,
+    matrix.system.tolerance,
+    matrix.system.vectorB,
+  ]);
+
+  const decompCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
+    if (!decompResult) return null;
+
+    if (decompResult.mode === "qr") {
+      return {
+        title: "分解正确性证据",
+        equation: "A = Q·R",
+        residual: decompResult.residual,
+        threshold: decompResult.threshold,
+        passed: decompResult.passed,
+        metrics: [
+          {
+            label: "maxAbs(Q^TQ-I)",
+            value: formatResidual(decompResult.orthResidual ?? Number.NaN),
+          },
+        ],
+      };
+    }
+
+    if (decompResult.mode === "cholesky") {
+      return {
+        title: "分解正确性证据",
+        equation: "A = L·L^T",
+        residual: decompResult.residual,
+        threshold: decompResult.threshold,
+        passed: decompResult.passed,
+      };
+    }
+
+    return {
+      title: "分解正确性证据",
+      equation: decompResult.mode === "lu" ? "P·A = L·U" : "A = L·U",
+      residual: decompResult.residual,
+      threshold: decompResult.threshold,
+      passed: decompResult.passed,
+      note:
+        decompResult.mode === "luPlain"
+          ? "普通 LU 不包含主元策略，病态矩阵下稳定性较弱。"
+          : undefined,
+    };
+  }, [decompResult]);
+
+  const eigenCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
+    if (!eigResult) return null;
+
+    const algebraicTotal = eigResult.multiplicities.reduce(
+      (sum, item) => sum + item.algebraic,
+      0
+    );
+    const geometricTotal = eigResult.multiplicities.reduce(
+      (sum, item) => sum + item.geometric,
+      0
+    );
+
+    return {
+      title: "特征分析正确性证据",
+      equation: "对任意 λ: geometric(λ) ≤ algebraic(λ)",
+      passed: eigResult.diagonalizable ? true : null,
+      metrics: [
+        { label: "代数重数总和", value: `${algebraicTotal}` },
+        { label: "几何重数总和", value: `${geometricTotal}` },
+      ],
+      note: eigResult.diagonalizable
+        ? "几何重数满足对角化条件。"
+        : "几何重数不足，矩阵不可对角化（该结论本身是有效结果）。",
+    };
+  }, [eigResult]);
 
   useEffect(() => {
     if (!matrix.operations.feedback) return;
@@ -824,6 +1126,10 @@ export default function Home() {
             })}
           </div>
           <DisplayModeSwitcher displayMode={matrix.displayMode} onChange={matrix.setDisplayMode} />
+          <CorrectnessPanelToggleCard
+            enabled={showCorrectnessPanel}
+            onToggle={setShowCorrectnessPanel}
+          />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
             <div className="flex items-center justify-between gap-2">
@@ -1018,6 +1324,9 @@ export default function Home() {
                         {matrix.operations.feedback.text}
                       </div>
                     ) : null}
+                    {showCorrectnessPanel && operationCorrectness ? (
+                      <CorrectnessPanel {...operationCorrectness} />
+                    ) : null}
                   </div>
                 </aside>
               </div>
@@ -1186,6 +1495,9 @@ export default function Home() {
                         ) : matrix.system.summary.solution ? (
                           <div className="font-mono text-xs">{matrix.system.summary.solution.map((v, i) => `x${i + 1}=${matrix.formatValue(v)}`).join(", ")}</div>
                         ) : null}
+                    {showCorrectnessPanel && systemCorrectness ? (
+                      <CorrectnessPanel {...systemCorrectness} />
+                    ) : null}
                         {matrix.system.summary.parametric ? (
                           <div className="font-mono text-xs">{matrix.system.summary.parametric.join("; ")}</div>
                         ) : null}
@@ -1434,6 +1746,9 @@ export default function Home() {
                         </div>
                       </>
                     ) : null}
+                    {showCorrectnessPanel && decompCorrectness ? (
+                      <CorrectnessPanel {...decompCorrectness} />
+                    ) : null}
 
                     {!decompResult ? (
                       <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
@@ -1535,6 +1850,9 @@ export default function Home() {
                             ))}
                           </div>
                         ))}
+                        {showCorrectnessPanel && eigenCorrectness ? (
+                          <CorrectnessPanel {...eigenCorrectness} />
+                        ) : null}
                       </div>
                     ) : (
                       <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
@@ -1723,11 +2041,3 @@ export default function Home() {
     </div>
   );
 }
-
-
-
-
-
-
-
-

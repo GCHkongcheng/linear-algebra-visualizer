@@ -2,6 +2,8 @@
 
 预览网址：[math.gchkc.top](https://math.gchkc.top)
 
+[![GitHub Repo stars](https://img.shields.io/github/stars/GCHkongcheng/linear-algebra-visualizer?style=social)](https://github.com/GCHkongcheng/linear-algebra-visualizer/stargazers)
+
 一个面向学习与工程实践的线性代数可视化工具。项目聚焦三件事：
 
 - 结果正确：核心算法提供残差与一致性校验，避免“看起来对”但实际错误。
@@ -167,3 +169,13 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.vercel.app
 
 - GitHub: <https://github.com/GCHkongcheng/linear-algebra-visualizer>
 - Email: 2839474636@qq.com
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=GCHkongcheng%2Flinear-algebra-visualizer&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/linear-algebra-visualizer&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/linear-algebra-visualizer&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=GCHkongcheng/linear-algebra-visualizer&type=date&legend=top-left" />
+ </picture>
+</a>
