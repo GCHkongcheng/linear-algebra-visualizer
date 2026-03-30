@@ -106,3 +106,10 @@ export type CholeskyResult = {
   L: string[][];
   Lt: string[][];
 };
+
+export type SVDResult = {
+  U: string[][];
+  Sigma: string[][];
+  Vt: string[][];
+  singularValues: string[];
+};

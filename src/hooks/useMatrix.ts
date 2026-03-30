@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   EPS,
@@ -32,6 +32,33 @@ import type {
 type Feedback = {
   text: string;
   tone: ResultTone;
+};
+
+export type MatrixHistorySnapshot = {
+  displayMode: DisplayMode;
+  operations: {
+    rows: number;
+    cols: number;
+    bRows: number;
+    bCols: number;
+    matrixA: string[][];
+    matrixB: string[][];
+    operation: MatrixOperation;
+    scalar: string;
+    resultMatrix: string[][] | null;
+  };
+  system: {
+    rows: number;
+    cols: number;
+    method: LinearSystemMethod;
+    tolerance: string;
+    maxIterations: string;
+    omega: string;
+    augmented: string[][];
+    iterativeResult: IterativeSolveResult | null;
+    steps: Step[];
+    summary: SolveSummary | null;
+  };
 };
 
 const DEFAULT_MATRIX_A = toInputMatrix([
@@ -313,7 +340,7 @@ export function useMatrix() {
       setSystemStepIndex(0);
       setSystemPlaying(false);
 
-      if (result.summary.type === "无解") {
+      if (result.summary.rankAug > result.summary.rankA) {
         setSystemFeedback({
           tone: "error",
           text: "当前方程组无解（rank([A|b]) > rank(A)）。",
@@ -321,7 +348,7 @@ export function useMatrix() {
         return;
       }
 
-      if (result.summary.type === "无穷多解") {
+      if (result.summary.rankA < systemCols) {
         setSystemFeedback({
           tone: "warning",
           text: "检测到自由变量，已生成参数化表达。",
@@ -329,7 +356,7 @@ export function useMatrix() {
         return;
       }
 
-      setSystemFeedback({ tone: "success", text: "高斯消去完成，得到唯一解。" });
+      setSystemFeedback({ tone: "success", text: "高斯消元完成，得到唯一解。" });
       return;
     }
 
@@ -341,7 +368,7 @@ export function useMatrix() {
       setSystemStepIndex(0);
       setSystemPlaying(false);
 
-      if (result.summary.type === "无解") {
+      if (result.summary.rankAug > result.summary.rankA) {
         setSystemFeedback({
           tone: "error",
           text: "Gauss-Jordan 判定该方程组无解。",
@@ -349,7 +376,7 @@ export function useMatrix() {
         return;
       }
 
-      if (result.summary.type === "无穷多解") {
+      if (result.summary.rankA < systemCols) {
         setSystemFeedback({
           tone: "warning",
           text: "Gauss-Jordan 判定存在自由变量，已给出参数化表达。",
@@ -376,13 +403,13 @@ export function useMatrix() {
     }
 
     const directSummary = solveLinearSystemByGaussJordan(normalized, systemCols).summary;
-    if (directSummary.type !== "唯一解") {
+    if (directSummary.rankAug > directSummary.rankA || directSummary.rankA < systemCols) {
       setSystemSummary(directSummary);
       setSystemIterativeResult(null);
       setSystemFeedback({
-        tone: directSummary.type === "无解" ? "error" : "warning",
+        tone: directSummary.rankAug > directSummary.rankA ? "error" : "warning",
         text:
-          directSummary.type === "无解"
+          directSummary.rankAug > directSummary.rankA
             ? "该系统无解，不适合使用迭代法。"
             : "该系统有无穷多解，迭代法不再给出唯一解近似。",
       });
@@ -491,6 +518,86 @@ export function useMatrix() {
 
   const { A: systemA, b: systemB } = splitAugmentedMatrix(systemAugmented, systemCols);
 
+  const historySnapshot = useMemo<MatrixHistorySnapshot>(
+    () => ({
+      displayMode,
+      operations: {
+        rows: opsRows,
+        cols: opsCols,
+        bRows: opsBRows,
+        bCols: opsBCols,
+        matrixA: opsMatrixA,
+        matrixB: opsMatrixB,
+        operation: opsOperation,
+        scalar: opsScalar,
+        resultMatrix: opsResultMatrix,
+      },
+      system: {
+        rows: systemRows,
+        cols: systemCols,
+        method: systemMethod,
+        tolerance: systemTolerance,
+        maxIterations: systemMaxIterations,
+        omega: systemOmega,
+        augmented: systemAugmented,
+        iterativeResult: systemIterativeResult,
+        steps: systemSteps,
+        summary: systemSummary,
+      },
+    }),
+    [
+      displayMode,
+      opsRows,
+      opsCols,
+      opsBRows,
+      opsBCols,
+      opsMatrixA,
+      opsMatrixB,
+      opsOperation,
+      opsScalar,
+      opsResultMatrix,
+      systemRows,
+      systemCols,
+      systemMethod,
+      systemTolerance,
+      systemMaxIterations,
+      systemOmega,
+      systemAugmented,
+      systemIterativeResult,
+      systemSteps,
+      systemSummary,
+    ]
+  );
+
+  const restoreHistorySnapshot = useCallback((snapshot: MatrixHistorySnapshot) => {
+    setDisplayMode(snapshot.displayMode);
+
+    setOpsRows(snapshot.operations.rows);
+    setOpsCols(snapshot.operations.cols);
+    setOpsBRows(snapshot.operations.bRows);
+    setOpsBCols(snapshot.operations.bCols);
+    setOpsMatrixA(snapshot.operations.matrixA);
+    setOpsMatrixB(snapshot.operations.matrixB);
+    setOpsOperation(snapshot.operations.operation);
+    setOpsScalar(snapshot.operations.scalar);
+    setOpsResultMatrix(snapshot.operations.resultMatrix);
+    setOpsFeedback(null);
+
+    setSystemRows(snapshot.system.rows);
+    setSystemCols(snapshot.system.cols);
+    setSystemMethod(snapshot.system.method);
+    setSystemTolerance(snapshot.system.tolerance);
+    setSystemMaxIterations(snapshot.system.maxIterations);
+    setSystemOmega(snapshot.system.omega);
+    setSystemAugmented(snapshot.system.augmented);
+    setSystemIterativeResult(snapshot.system.iterativeResult);
+    setSystemSteps(snapshot.system.steps);
+    setSystemSummary(snapshot.system.summary);
+    setSystemStepIndex(0);
+    setSystemPlaying(false);
+    setSystemFeedback(null);
+  }, []);
+
   return {
     EPS,
     sizeOptions,
@@ -500,6 +607,10 @@ export function useMatrix() {
     formatEigenComponent: (value: EigenComponent) =>
       formatEigenComponent(value, displayMode),
     describeStep: (step: Step) => describeStep(step, displayMode),
+    history: {
+      snapshot: historySnapshot,
+      restore: restoreHistorySnapshot,
+    },
     operations: {
       rows: opsRows,
       cols: opsCols,

@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 
 import {
   analyzeConditionNumbers,
@@ -14,6 +14,9 @@ import {
   qrDecomposition,
   qrOrthogonalityResidual,
   qrResidual,
+  svdDecomposition,
+  svdOrthogonalityResiduals,
+  svdResidual,
   relativeEigenError,
   relativeMatrixErrorInfinity,
   relativeVectorErrorInfinity,
@@ -229,6 +232,37 @@ function testQrDecomposition() {
   );
 }
 
+function testSvdDecomposition() {
+  const matrix = [
+    ["1", "0"],
+    ["0", "2"],
+    ["0", "0"],
+  ];
+
+  const svd = svdDecomposition(matrix);
+  assert.ok(svd, "SVD decomposition should return a result");
+
+  const residual = svdResidual(matrix, svd);
+  assert.ok(residual !== null, "SVD residual should be computable");
+  assert.ok(residual < 1e-8, "SVD residual is too large: " + residual.toExponential(3));
+
+  const orth = svdOrthogonalityResiduals(svd);
+  assert.ok(orth.u !== null, "U orthogonality residual should be computable");
+  assert.ok(orth.v !== null, "V orthogonality residual should be computable");
+  assert.ok(
+    (orth.u ?? Number.POSITIVE_INFINITY) < 1e-8,
+    "U orthogonality residual is too large: " + (orth.u ?? Number.NaN).toExponential(3)
+  );
+  assert.ok(
+    (orth.v ?? Number.POSITIVE_INFINITY) < 1e-8,
+    "V orthogonality residual is too large: " + (orth.v ?? Number.NaN).toExponential(3)
+  );
+
+  const singularValues = svd.singularValues.map((value) => Number(value));
+  assert.ok(singularValues.length >= 2, "SVD should return at least two singular values for this matrix");
+  assert.ok(Math.abs(singularValues[0] - 2) < 1e-6, "Leading singular value should be close to 2");
+  assert.ok(Math.abs(singularValues[1] - 1) < 1e-6, "Second singular value should be close to 1");
+}
 function testCholeskyDecomposition() {
   const matrix = [
     ["4", "12", "-16"],
@@ -484,6 +518,7 @@ function run() {
   testLuWithPivoting();
   testLuRandomResiduals();
   testQrDecomposition();
+  testSvdDecomposition();
   testCholeskyDecomposition();
   testLinearSystemResidual();
   testJacobiIterationConvergence();

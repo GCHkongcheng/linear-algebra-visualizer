@@ -6,7 +6,9 @@ import {
   Calculator,
   CircleHelp,
   FunctionSquare,
+  Redo2,
   SplitSquareVertical,
+  Undo2,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +20,7 @@ import { OperationButtonGroup } from "@/components/matrix/OperationButtonGroup";
 import { ToastHost, type ToastItem } from "@/components/matrix/ToastHost";
 import { SaveToLibraryButton } from "@/components/matrix/SaveToLibraryButton";
 import { StepCard } from "@/components/matrix/StepCard";
-import { useMatrix } from "@/hooks/useMatrix";
+import { useMatrix, type MatrixHistorySnapshot } from "@/hooks/useMatrix";
 import {
   analyzeConditionNumbers,
   applyPaste,
@@ -42,6 +44,9 @@ import {
   qrResidual,
   resizeInputMatrix,
   solveNumericLinearSystem,
+  svdDecomposition,
+  svdOrthogonalityResiduals,
+  svdResidual,
   toInputMatrix,
   toNumericMatrix,
 } from "@/lib/matrix-core";
@@ -53,6 +58,7 @@ import type {
   LUResult,
   QRResult,
   ResultTone,
+  SVDResult,
 } from "@/types/matrix";
 import {
   type ActiveContext,
@@ -68,7 +74,7 @@ type TabId =
   | "decomposition"
   | "eigen"
   | "errorAnalysis";
-type DecompositionMode = "lu" | "luPlain" | "qr" | "cholesky";
+type DecompositionMode = "lu" | "luPlain" | "qr" | "cholesky" | "svd";
 
 type Feedback = {
   tone: ResultTone;
@@ -110,9 +116,19 @@ type DecompositionResult =
       residual: number | null;
       threshold: number;
       passed: boolean;
+    }
+  | {
+      mode: "svd";
+      decomposition: SVDResult;
+      residual: number | null;
+      orthResidualU: number | null;
+      orthResidualV: number | null;
+      threshold: number;
+      passed: boolean | null;
     };
 
 const RESIDUAL_THRESHOLD = 1e-10;
+const HISTORY_LIMIT = 120;
 
 const OPERATION_OPTIONS = [
   { id: "add", label: "A + B" },
@@ -138,6 +154,7 @@ const DECOMPOSITION_OPTIONS: Array<{ id: DecompositionMode; label: string }> = [
   { id: "luPlain", label: "LU（普通）" },
   { id: "qr", label: "QR（Householder）" },
   { id: "cholesky", label: "Cholesky分解" },
+  { id: "svd", label: "SVD分解" },
 ];
 
 const SYSTEM_METHOD_OPTIONS: Array<{ id: LinearSystemMethod; label: string }> = [
@@ -187,6 +204,43 @@ type CorrectnessDescriptor = {
   metrics?: Array<{ label: string; value: string }>;
 };
 
+type LocalHistorySnapshot = {
+  activeTab: TabId;
+  showCorrectnessPanel: boolean;
+  activeOperationTarget: "A" | "B";
+  determinant: {
+    size: number;
+    matrix: string[][];
+    result: string | null;
+  };
+  decomposition: {
+    mode: DecompositionMode;
+    rows: number;
+    cols: number;
+    matrix: string[][];
+    result: DecompositionResult | null;
+  };
+  eigen: {
+    size: number;
+    matrix: string[][];
+    result: EigenAnalysisResult | null;
+    vectorB: string[];
+    perturbationResult: EigenPerturbationResult | null;
+  };
+};
+
+type AppHistorySnapshot = {
+  matrix: MatrixHistorySnapshot;
+  local: LocalHistorySnapshot;
+};
+
+type HistoryState = {
+  canUndo: boolean;
+  canRedo: boolean;
+  index: number;
+  total: number;
+};
+
 function computeAxMinusBResidual(
   matrixA: number[][],
   vectorX: number[],
@@ -213,6 +267,13 @@ function computeAxMinusBResidual(
 }
 function cloneMatrixValues(matrix: string[][]): string[][] {
   return matrix.map((row) => row.map((value) => value || "0"));
+}
+
+function deepClone<T>(value: T): T {
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function DisplayModeSwitcher({
@@ -277,8 +338,57 @@ function CorrectnessPanelToggleCard({
   );
 }
 
+function HistoryControlCard({
+  canUndo,
+  canRedo,
+  index,
+  total,
+  onUndo,
+  onRedo,
+}: {
+  canUndo: boolean;
+  canRedo: boolean;
+  index: number;
+  total: number;
+  onUndo: () => void;
+  onRedo: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-sm font-medium text-slate-700">操作历史</div>
+        <div className="text-xs text-slate-500">{total ? `${index}/${total}` : "0/0"}</div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          className="step-control justify-center"
+          aria-label="撤销"
+        >
+          <Undo2 size={14} />
+          撤销
+        </button>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          className="step-control justify-center"
+          aria-label="重做"
+        >
+          <Redo2 size={14} />
+          重做
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const matrix = useMatrix();
+  const matrixHistorySnapshot = matrix.history.snapshot;
+  const restoreMatrixHistorySnapshot = matrix.history.restore;
   const [activeTab, setActiveTab] = useState<TabId>("operations");
   const [showCorrectnessPanel, setShowCorrectnessPanel] = useState(false);
 
@@ -323,6 +433,15 @@ export default function Home() {
   const toastSeqRef = useRef(0);
   const toastTimersRef = useRef<Map<number, number>>(new Map());
   const toastGroupRef = useRef<Map<string, number>>(new Map());
+  const historyStackRef = useRef<AppHistorySnapshot[]>([]);
+  const historyIndexRef = useRef(-1);
+  const historyApplyingRef = useRef(false);
+  const [historyState, setHistoryState] = useState<HistoryState>({
+    canUndo: false,
+    canRedo: false,
+    index: 0,
+    total: 0,
+  });
 
   const dismissToast = useCallback((id: number) => {
     const timer = toastTimersRef.current.get(id);
@@ -402,6 +521,177 @@ export default function Home() {
     []
   );
 
+  const syncHistoryState = useCallback(() => {
+    const total = historyStackRef.current.length;
+    const index = historyIndexRef.current;
+    setHistoryState({
+      canUndo: index > 0,
+      canRedo: index >= 0 && index < total - 1,
+      index: total === 0 || index < 0 ? 0 : index + 1,
+      total,
+    });
+  }, []);
+
+  const localHistorySnapshot = useMemo<LocalHistorySnapshot>(
+    () => ({
+      activeTab,
+      showCorrectnessPanel,
+      activeOperationTarget,
+      determinant: {
+        size: detSize,
+        matrix: detMatrix,
+        result: detResult,
+      },
+      decomposition: {
+        mode: decompMode,
+        rows: decompRows,
+        cols: decompCols,
+        matrix: decompMatrix,
+        result: decompResult,
+      },
+      eigen: {
+        size: eigSize,
+        matrix: eigMatrix,
+        result: eigResult,
+        vectorB: eigVectorB,
+        perturbationResult: eigPerturbationResult,
+      },
+    }),
+    [
+      activeOperationTarget,
+      activeTab,
+      decompCols,
+      decompMatrix,
+      decompMode,
+      decompResult,
+      decompRows,
+      detMatrix,
+      detResult,
+      detSize,
+      eigMatrix,
+      eigPerturbationResult,
+      eigResult,
+      eigSize,
+      eigVectorB,
+      showCorrectnessPanel,
+    ]
+  );
+
+  const appHistorySnapshot = useMemo<AppHistorySnapshot>(
+    () => ({
+      matrix: matrixHistorySnapshot,
+      local: localHistorySnapshot,
+    }),
+    [localHistorySnapshot, matrixHistorySnapshot]
+  );
+
+  const applyHistorySnapshot = useCallback(
+    (snapshot: AppHistorySnapshot) => {
+      historyApplyingRef.current = true;
+
+      restoreMatrixHistorySnapshot(deepClone(snapshot.matrix));
+
+      setActiveTab(snapshot.local.activeTab);
+      setShowCorrectnessPanel(snapshot.local.showCorrectnessPanel);
+      setActiveOperationTarget(snapshot.local.activeOperationTarget);
+
+      setDetSize(snapshot.local.determinant.size);
+      setDetMatrix(snapshot.local.determinant.matrix);
+      setDetResult(snapshot.local.determinant.result);
+      setDetFeedback(null);
+
+      setDecompMode(snapshot.local.decomposition.mode);
+      setDecompRows(snapshot.local.decomposition.rows);
+      setDecompCols(snapshot.local.decomposition.cols);
+      setDecompMatrix(snapshot.local.decomposition.matrix);
+      setDecompResult(snapshot.local.decomposition.result);
+      setDecompFeedback(null);
+
+      setEigSize(snapshot.local.eigen.size);
+      setEigMatrix(snapshot.local.eigen.matrix);
+      setEigResult(snapshot.local.eigen.result);
+      setEigVectorB(snapshot.local.eigen.vectorB);
+      setEigPerturbationResult(snapshot.local.eigen.perturbationResult);
+      setEigFeedback(null);
+    },
+    [restoreMatrixHistorySnapshot]
+  );
+
+  const undoHistory = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+    historyIndexRef.current -= 1;
+    const target = historyStackRef.current[historyIndexRef.current];
+    if (!target) return;
+    applyHistorySnapshot(deepClone(target));
+    syncHistoryState();
+  }, [applyHistorySnapshot, syncHistoryState]);
+
+  const redoHistory = useCallback(() => {
+    const nextIndex = historyIndexRef.current + 1;
+    if (nextIndex >= historyStackRef.current.length) return;
+    historyIndexRef.current = nextIndex;
+    const target = historyStackRef.current[nextIndex];
+    if (!target) return;
+    applyHistorySnapshot(deepClone(target));
+    syncHistoryState();
+  }, [applyHistorySnapshot, syncHistoryState]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undoHistory();
+        return;
+      }
+
+      if (key === "y" || (key === "z" && event.shiftKey)) {
+        event.preventDefault();
+        redoHistory();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [redoHistory, undoHistory]);
+
+  useEffect(() => {
+    const nextSnapshot = deepClone(appHistorySnapshot);
+    const currentStack = historyStackRef.current;
+
+    if (currentStack.length === 0) {
+      historyStackRef.current = [nextSnapshot];
+      historyIndexRef.current = 0;
+      syncHistoryState();
+      return;
+    }
+
+    if (historyApplyingRef.current) {
+      historyApplyingRef.current = false;
+      syncHistoryState();
+      return;
+    }
+
+    const current = currentStack[historyIndexRef.current];
+    if (current && JSON.stringify(current) === JSON.stringify(nextSnapshot)) {
+      syncHistoryState();
+      return;
+    }
+
+    let nextStack = currentStack.slice(0, historyIndexRef.current + 1);
+    nextStack.push(nextSnapshot);
+
+    if (nextStack.length > HISTORY_LIMIT) {
+      nextStack = nextStack.slice(nextStack.length - HISTORY_LIMIT);
+    }
+
+    historyStackRef.current = nextStack;
+    historyIndexRef.current = nextStack.length - 1;
+    syncHistoryState();
+  }, [appHistorySnapshot, syncHistoryState]);
+
   const computeDeterminant = () => {
     const normalized = normalizeMatrixInput(detMatrix);
     if (normalized.length !== normalized[0].length) {
@@ -415,7 +705,7 @@ export default function Home() {
 
   const computeDecomposition = () => {
     const normalized = normalizeMatrixInput(decompMatrix);
-    if (decompMode !== "qr" && decompRows !== decompCols) {
+    if (decompMode !== "qr" && decompMode !== "svd" && decompRows !== decompCols) {
       setDecompResult(null);
       setDecompFeedback({ tone: "error", text: "LU/Cholesky 需要方阵" });
       return;
@@ -477,6 +767,35 @@ export default function Home() {
         passed,
       });
       setDecompFeedback({ tone: passed ? "success" : "warning", text: "QR 分解完成" });
+      return;
+    }
+
+    if (decompMode === "svd") {
+      const decomposition = svdDecomposition(normalized);
+      if (!decomposition) {
+        setDecompResult(null);
+        setDecompFeedback({ tone: "error", text: "SVD 需要纯数值输入" });
+        return;
+      }
+
+      const residual = svdResidual(normalized, decomposition);
+      const orthResiduals = svdOrthogonalityResiduals(decomposition);
+      const passed =
+        residual !== null &&
+        orthResiduals.max !== null &&
+        residual < RESIDUAL_THRESHOLD &&
+        orthResiduals.max < RESIDUAL_THRESHOLD;
+
+      setDecompResult({
+        mode: "svd",
+        decomposition,
+        residual,
+        orthResidualU: orthResiduals.u,
+        orthResidualV: orthResiduals.v,
+        threshold: RESIDUAL_THRESHOLD,
+        passed,
+      });
+      setDecompFeedback({ tone: passed ? "success" : "warning", text: "SVD 分解完成" });
       return;
     }
 
@@ -675,7 +994,11 @@ export default function Home() {
     }
 
     if (context === "decomposition") {
-      if (decompMode === "qr" || copied.length !== copied[0]?.length) {
+      if (
+        decompMode === "qr" ||
+        decompMode === "svd" ||
+        copied.length !== copied[0]?.length
+      ) {
         const rows = Math.max(1, copied.length);
         const cols = Math.max(1, copied[0]?.length ?? 1);
         setDecompRows(rows);
@@ -789,6 +1112,9 @@ export default function Home() {
     if (decompResult.mode === "qr") {
       return `A=QR, maxAbs(A-QR)=${decompResult.residual?.toExponential(3) ?? "N/A"}, maxAbs(Q^TQ-I)=${decompResult.orthResidual?.toExponential(3) ?? "N/A"}`;
     }
+    if (decompResult.mode === "svd") {
+      return `A=UΣV^T, maxAbs(A-UΣV^T)=${decompResult.residual?.toExponential(3) ?? "N/A"}, maxAbs(U^TU-I)=${decompResult.orthResidualU?.toExponential(3) ?? "N/A"}, maxAbs(V^TV-I)=${decompResult.orthResidualV?.toExponential(3) ?? "N/A"}`;
+    }
     return `A=L*L^T, maxAbs(A-LL^T)=${decompResult.residual?.toExponential(3) ?? "N/A"}`;
   }, [decompResult]);
 
@@ -804,6 +1130,7 @@ export default function Home() {
       return decompResult.decomposition.L;
     }
     if (decompResult.mode === "qr") return decompResult.decomposition.Q;
+    if (decompResult.mode === "svd") return decompResult.decomposition.U;
     return decompResult.decomposition.L;
   }, [decompResult]);
   const operationCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
@@ -975,6 +1302,26 @@ export default function Home() {
   const decompCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
     if (!decompResult) return null;
 
+    if (decompResult.mode === "svd") {
+      return {
+        title: "分解正确性证据",
+        equation: "A = U·Σ·V^T",
+        residual: decompResult.residual,
+        threshold: decompResult.threshold,
+        passed: decompResult.passed,
+        metrics: [
+          {
+            label: "maxAbs(U^TU-I)",
+            value: formatResidual(decompResult.orthResidualU ?? Number.NaN),
+          },
+          {
+            label: "maxAbs(V^TV-I)",
+            value: formatResidual(decompResult.orthResidualV ?? Number.NaN),
+          },
+        ],
+      };
+    }
+
     if (decompResult.mode === "qr") {
       return {
         title: "分解正确性证据",
@@ -1130,7 +1477,6 @@ export default function Home() {
             enabled={showCorrectnessPanel}
             onToggle={setShowCorrectnessPanel}
           />
-
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -1154,6 +1500,14 @@ export default function Home() {
             onDelete={deleteInventoryMatrix}
             onRename={renameInventoryMatrix}
             onSmartImport={handleSmartImportMatrix}
+          />
+          <HistoryControlCard
+            canUndo={historyState.canUndo}
+            canRedo={historyState.canRedo}
+            index={historyState.index}
+            total={historyState.total}
+            onUndo={undoHistory}
+            onRedo={redoHistory}
           />
         </aside>
 
@@ -1594,7 +1948,7 @@ export default function Home() {
                             onChange={(event) => {
                               const nextMode = event.target.value as DecompositionMode;
                               setDecompMode(nextMode);
-                              if (nextMode !== "qr") {
+                              if (nextMode !== "qr" && nextMode !== "svd") {
                                 setDecompCols(decompRows);
                                 setDecompMatrix((prev) => resizeInputMatrix(prev, decompRows, decompRows, "0"));
                               }
@@ -1612,7 +1966,7 @@ export default function Home() {
                             onChange={(event) => {
                               const nextRows = Number(event.target.value);
                               setDecompRows(nextRows);
-                              if (decompMode === "qr") {
+                              if (decompMode === "qr" || decompMode === "svd") {
                                 setDecompMatrix((prev) => resizeInputMatrix(prev, nextRows, decompCols, "0"));
                                 return;
                               }
@@ -1631,7 +1985,7 @@ export default function Home() {
                             value={decompCols}
                             onChange={(event) => {
                               const nextCols = Number(event.target.value);
-                              if (decompMode === "qr") {
+                              if (decompMode === "qr" || decompMode === "svd") {
                                 setDecompCols(nextCols);
                                 setDecompMatrix((prev) =>
                                   resizeInputMatrix(prev, decompRows, nextCols, "0")
@@ -1743,6 +2097,35 @@ export default function Home() {
                         <div className="space-y-2">
                           <div className="text-xs font-semibold tracking-wide text-slate-600">L^T（L 的转置）</div>
                           <MatrixGrid matrix={decompResult.decomposition.Lt} displayMode={matrix.displayMode} />
+                        </div>
+                      </>
+                    ) : null}
+
+                    {decompResult?.mode === "svd" ? (
+                      <>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                          SVD 分解关系：A = U·Σ·V^T
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">
+                            U（左奇异向量）
+                          </div>
+                          <MatrixGrid matrix={decompResult.decomposition.U} displayMode={matrix.displayMode} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">
+                            Σ（奇异值对角矩阵）
+                          </div>
+                          <MatrixGrid matrix={decompResult.decomposition.Sigma} displayMode={matrix.displayMode} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">
+                            V^T（右奇异向量转置）
+                          </div>
+                          <MatrixGrid matrix={decompResult.decomposition.Vt} displayMode={matrix.displayMode} />
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700">
+                          奇异值：[{decompResult.decomposition.singularValues.join(", ")}]
                         </div>
                       </>
                     ) : null}
