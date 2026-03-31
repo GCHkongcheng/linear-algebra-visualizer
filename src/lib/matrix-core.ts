@@ -105,7 +105,11 @@ function roundNumericLiterals(expr: string): string {
 function prettySymbolic(expr: string): string {
   return roundNumericLiterals(expr)
     .replace(/\*/g, "·")
-    .replace(/sqrt\(([^)]+)\)/g, "√$1)");
+    .replace(/sqrt\(/g, "√(");
+}
+
+function shouldKeepSymbolicInFractionMode(expr: string): boolean {
+  return /sqrt\(|\bpi\b|\be\b|\bi\b/u.test(expr);
 }
 
 function tryFraction(expr: string): Fraction | null {
@@ -152,15 +156,25 @@ export function normalizeMatrixInput(inputs: string[][]): string[][] {
 }
 
 export function formatValue(expr: string, mode: DisplayMode): string {
-  const simplified = simplifyExpr(expr || "0");
+  const raw = expr || "0";
+  const simplified = simplifyExpr(raw);
   const numeric = numericValue(simplified);
+  const preserveSymbolicInFraction =
+    shouldKeepSymbolicInFractionMode(raw) ||
+    shouldKeepSymbolicInFractionMode(simplified);
 
   if (mode === "fraction") {
+    if (preserveSymbolicInFraction) {
+      return prettySymbolic(raw);
+    }
+
     const fraction = tryFraction(simplified);
     if (fraction) return fractionToString(fraction);
+
     if (numeric !== null) {
       return fractionToString(new Fraction(numeric).simplify(1e-8));
     }
+
     return prettySymbolic(simplified);
   }
 

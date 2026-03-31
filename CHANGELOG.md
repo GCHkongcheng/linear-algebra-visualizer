@@ -14,6 +14,10 @@
 - 文档弹窗从纯文本展示升级为 Markdown 渲染，支持标题、列表、表格等常见语法。
 
 ### Commit Audit
+- 2026-03-31 16:30:26 | 提交：Implement mobile drawer navigation with smooth transitions
+  - 文件审查：修改 1
+  - 变更范围：`src/app/page.tsx`
+  - 风险提示：涉及前端交互，建议人工回归关键页面
 - 2026-03-30 21:02:46 | 提交：Add SVD decomposition with validation and undo redo history
   - 文件审查：修改 5
   - 变更范围：`scripts/test-math.ts`、`src/app/page.tsx`、`src/hooks/useMatrix.ts`、`src/lib/matrix-core.ts`、`src/types/matrix.ts`

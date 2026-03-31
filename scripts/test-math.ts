@@ -8,6 +8,7 @@ import {
   luDecomposition,
   luResidual,
   maxAbsAxMinusB,
+  formatValue,
   numericValue,
   perturbNumericMatrix,
   perturbNumericVector,
@@ -484,6 +485,13 @@ function testPerturbationAndRelativeErrors() {
   assert.ok(vectorError >= 0, "向量相对误差应非负");
 }
 
+function testRootFormattingBehavior() {
+  const symbolicRoot = formatValue("sqrt(2)", "fraction");
+  assert.equal(symbolicRoot, "√(2)", "fraction 模式下根号应保留符号表达");
+
+  const decimalRoot = formatValue("sqrt(2)", "decimal");
+  assert.ok(decimalRoot !== "√(2)", "decimal 模式下应给出近似数值");
+}
 function testSolveNumericLinearSystemAndEigenRelativeError() {
   const matrix = [
     [4, 1],
@@ -529,6 +537,7 @@ function run() {
   testConditionNumberAnalysis();
   testPerturbationAndRelativeErrors();
   testSolveNumericLinearSystemAndEigenRelativeError();
+  testRootFormattingBehavior();
 
   console.log("[test:math] 所有回归测试通过");
 }
