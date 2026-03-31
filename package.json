@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/speed-insights": "^2.0.0",
     "fraction.js": "^5.3.4",
     "lucide-react": "^0.577.0",
     "mathjs": "^15.1.1",

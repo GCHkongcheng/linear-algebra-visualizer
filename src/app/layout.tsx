@@ -1,4 +1,5 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { getSiteUrl, siteConfig } from "@/lib/site";
 
@@ -93,6 +94,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         {children}
+        <SpeedInsights />
       </body>
     </html>
   );
