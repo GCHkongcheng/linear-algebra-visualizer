@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   AlertTriangle,
@@ -6,9 +6,11 @@ import {
   Calculator,
   CircleHelp,
   FunctionSquare,
+  Menu,
   Redo2,
   SplitSquareVertical,
   Undo2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -390,6 +392,7 @@ export default function Home() {
   const matrixHistorySnapshot = matrix.history.snapshot;
   const restoreMatrixHistorySnapshot = matrix.history.restore;
   const [activeTab, setActiveTab] = useState<TabId>("operations");
+  const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [showCorrectnessPanel, setShowCorrectnessPanel] = useState(false);
 
   const [detSize, setDetSize] = useState(3);
@@ -510,6 +513,26 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isNavDrawerOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsNavDrawerOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isNavDrawerOpen]);
+
   const tabs = useMemo(
     () => [
       { id: "operations", label: "矩阵运算", icon: Calculator },
@@ -520,6 +543,11 @@ export default function Home() {
     ],
     []
   );
+
+  const handleTabSwitch = useCallback((tab: TabId) => {
+    setActiveTab(tab);
+    setIsNavDrawerOpen(false);
+  }, []);
 
   const syncHistoryState = useCallback(() => {
     const total = historyStackRef.current.length;
@@ -1438,8 +1466,19 @@ export default function Home() {
     <div className="min-h-screen px-6 py-10 text-[15px] text-slate-900">
       <header className="mx-auto w-full max-w-6xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
-            线性代数工作室
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsNavDrawerOpen(true)}
+              className="step-control lg:hidden"
+              aria-label="打开导航菜单"
+            >
+              <Menu size={14} />
+              菜单
+            </button>
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
+              线性代数工作室
+            </div>
           </div>
           <Link href="/about" className="step-control" aria-label="打开关于页面">
             <CircleHelp size={14} />
@@ -1455,7 +1494,35 @@ export default function Home() {
       </header>
 
       <div className="mx-auto mt-8 grid w-full max-w-6xl gap-6 lg:grid-cols-[240px_1fr]">
-        <aside className="studio-card h-fit space-y-4">
+        <button
+          type="button"
+          className={`fixed inset-0 z-40 transition-opacity duration-300 lg:hidden ${
+            isNavDrawerOpen
+              ? "pointer-events-auto bg-slate-900/35 opacity-100 backdrop-blur-[1.5px]"
+              : "pointer-events-none opacity-0"
+          }`}
+          aria-label="关闭导航菜单"
+          onClick={() => setIsNavDrawerOpen(false)}
+        />
+
+        <aside
+          className={`studio-card space-y-4 lg:h-fit lg:translate-x-0 lg:overflow-visible ${
+            isNavDrawerOpen ? "translate-x-0" : "-translate-x-full"
+          } fixed inset-y-0 left-0 z-50 w-[min(88vw,320px)] overflow-y-auto rounded-none border-r border-slate-200 pb-6 pt-4 shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu will-change-transform lg:static lg:w-auto lg:rounded-3xl lg:border lg:border-slate-200 lg:p-5 lg:shadow-none`}
+        >
+          <div className="mb-1 flex items-center justify-between lg:hidden">
+            <div className="text-sm font-semibold text-slate-700">导航菜单</div>
+            <button
+              type="button"
+              onClick={() => setIsNavDrawerOpen(false)}
+              className="step-control"
+              aria-label="关闭导航菜单"
+            >
+              <X size={14} />
+              关闭
+            </button>
+          </div>
+
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">导航</div>
           <div className="grid gap-2">
             {tabs.map((tab) => {
@@ -1463,7 +1530,7 @@ export default function Home() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabId)}
+                  onClick={() => handleTabSwitch(tab.id as TabId)}
                   className={`nav-tab ${activeTab === tab.id ? "nav-tab-active" : ""}`}
                 >
                   <Icon size={16} />
