@@ -1,14 +1,18 @@
 export const siteConfig = {
-  name: "线性代数工作台",
-  shortName: "线代工作台",
+  name: "数值分析工作台",
+  shortName: "数值分析",
   description:
-    "\u9762\u5411\u7ebf\u6027\u4ee3\u6570\u5b66\u4e60\u4e0e\u5de5\u7a0b\u5b9e\u8df5\u7684\u53ef\u89c6\u5316\u5de5\u5177\uff0c\u652f\u6301\u77e9\u9635\u8fd0\u7b97\u3001\u7ebf\u6027\u65b9\u7a0b\u7ec4\u3001\u77e9\u9635\u5206\u89e3\u4e0e\u7279\u5f81\u5206\u6790\u3002",
+    "面向数值分析学习与工程实践的可视化工具，支持线性代数计算、非线性方程求根、插值逼近、数值积分、常微分方程与误差分析。",
   keywords: [
-    "\u7ebf\u6027\u4ee3\u6570",
-    "\u77e9\u9635\u8ba1\u7b97",
-    "\u9ad8\u65af\u6d88\u5143",
-    "LU\u5206\u89e3",
-    "\u7279\u5f81\u503c",
+    "数值分析",
+    "数值计算",
+    "线性代数",
+    "矩阵计算",
+    "非线性方程",
+    "插值逼近",
+    "数值积分",
+    "常微分方程",
+    "误差分析",
     "Next.js",
     "Math.js",
   ],
@@ -34,5 +38,5 @@ export function getSiteUrl(): string {
   );
   if (fromVercel) return fromVercel;
 
-  return "https://linear-algebra-visualizer.vercel.app";
+  return "https://numerical-analysis-visualizer.vercel.app";
 }

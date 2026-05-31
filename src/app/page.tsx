@@ -19,6 +19,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CorrectnessPanel } from "@/components/matrix/CorrectnessPanel";
+import {
+  ExperimentCasePanel,
+  MethodComparisonTable,
+  ParameterScanTable,
+  ReliabilityPanel,
+  SaveExperimentButton,
+} from "@/components/common/ExperimentTools";
 import { MatrixGrid } from "@/components/matrix/MatrixGrid";
 import { MatrixShelf } from "@/components/matrix/MatrixShelf";
 import { OperationButtonGroup } from "@/components/matrix/OperationButtonGroup";
@@ -52,6 +59,9 @@ import {
   qrOrthogonalityResidual,
   qrResidual,
   resizeInputMatrix,
+  solveLinearSystemByGaussJordan,
+  solveLinearSystemIterative,
+  solveLinearSystemWithSteps,
   solveNumericLinearSystem,
   svdDecomposition,
   svdOrthogonalityResiduals,
@@ -63,6 +73,7 @@ import type {
   CholeskyResult,
   DisplayMode,
   EigenAnalysisResult,
+  IterativeMethod,
   LinearSystemMethod,
   LUResult,
   QRResult,
@@ -75,6 +86,12 @@ import {
   suggestNameForContext,
   useMatrixLibraryStore,
 } from "@/store/matrix-library";
+import type {
+  ComparisonRow,
+  ExperimentCase,
+  ReliabilityItem,
+  ScanRow,
+} from "@/types/experiment";
 
 type TabId =
   | "operations"
@@ -142,6 +159,7 @@ type DecompositionResult =
 
 const RESIDUAL_THRESHOLD = 1e-10;
 const HISTORY_LIMIT = 120;
+const NAV_DRAWER_MEDIA_QUERY = "(max-width: 1023px)";
 
 const OPERATION_OPTIONS = [
   { id: "add", label: "A + B" },
@@ -218,7 +236,6 @@ type CorrectnessDescriptor = {
 };
 
 type LocalHistorySnapshot = {
-  activeTab: TabId;
   showCorrectnessPanel: boolean;
   activeOperationTarget: "A" | "B";
   determinant: {
@@ -254,6 +271,101 @@ type HistoryState = {
   total: number;
 };
 
+type NavSection = {
+  title: string;
+  items: Array<{
+    id: TabId;
+    label: string;
+    description: string;
+    icon: typeof Calculator;
+  }>;
+};
+
+type SidebarToolTab = "nav" | "cases" | "params" | "verify" | "data";
+
+const SIDEBAR_TOOL_TABS: Array<{ id: SidebarToolTab; label: string }> = [
+  { id: "nav", label: "导航" },
+  { id: "cases", label: "案例" },
+  { id: "params", label: "参数" },
+  { id: "verify", label: "验证" },
+  { id: "data", label: "数据" },
+];
+
+const MATRIX_EXPERIMENT_CASES: Record<string, ExperimentCase[]> = {
+  operations: [
+    {
+      id: "ops-inverse",
+      title: "可逆矩阵验证",
+      description: "载入 3x3 可逆矩阵，适合计算逆矩阵并查看 A*A^-1 残差。",
+      tag: "残差",
+    },
+    {
+      id: "ops-rref",
+      title: "RREF 行变换",
+      description: "载入带相关行的矩阵，观察秩与最简阶梯形。",
+      tag: "秩",
+    },
+  ],
+  system: [
+    {
+      id: "system-unique",
+      title: "唯一解方程组",
+      description: "经典 3 元线性系统，适合比较直接法与迭代法。",
+      tag: "直接法",
+    },
+    {
+      id: "system-iterative",
+      title: "对角占优迭代",
+      description: "严格对角占优系统，Jacobi/Gauss-Seidel 通常收敛。",
+      tag: "收敛",
+    },
+  ],
+  determinant: [
+    {
+      id: "det-singular",
+      title: "奇异矩阵",
+      description: "两行线性相关，行列式应为 0。",
+      tag: "奇异",
+    },
+  ],
+  decomposition: [
+    {
+      id: "decomp-spd",
+      title: "对称正定矩阵",
+      description: "适合 Cholesky，也可比较 LU/QR/SVD 残差。",
+      tag: "SPD",
+    },
+    {
+      id: "decomp-rect",
+      title: "长方矩阵",
+      description: "适合 QR 与 SVD，对比非方阵分解能力。",
+      tag: "SVD",
+    },
+  ],
+  eigen: [
+    {
+      id: "eigen-diagonalizable",
+      title: "可对角化矩阵",
+      description: "具有清晰特征结构的矩阵，用于验证特征分析。",
+      tag: "特征",
+    },
+    {
+      id: "eigen-defective",
+      title: "缺陷矩阵",
+      description: "Jordan 块示例，几何重数不足。",
+      tag: "不可对角化",
+    },
+  ],
+  errorAnalysis: [
+    {
+      id: "error-hilbert",
+      title: "病态 Hilbert 矩阵",
+      description: "条件数较大，适合观察扰动放大。",
+      tag: "病态",
+    },
+  ],
+};
+
 function computeAxMinusBResidual(
   matrixA: number[][],
   vectorX: number[],
@@ -287,6 +399,10 @@ function deepClone<T>(value: T): T {
     return structuredClone(value);
   }
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isNavDrawerViewport(): boolean {
+  return typeof window !== "undefined" && window.matchMedia(NAV_DRAWER_MEDIA_QUERY).matches;
 }
 
 function DisplayModeSwitcher({
@@ -456,6 +572,19 @@ export default function Home() {
     index: 0,
     total: 0,
   });
+  const [matrixComparisonRows, setMatrixComparisonRows] = useState<ComparisonRow[]>([]);
+  const [matrixScanRows, setMatrixScanRows] = useState<ScanRow[]>([]);
+  const [sidebarToolTab, setSidebarToolTab] = useState<SidebarToolTab>("nav");
+
+  const openNavDrawer = useCallback(() => {
+    if (isNavDrawerViewport()) {
+      setIsNavDrawerOpen(true);
+    }
+  }, []);
+
+  const closeNavDrawer = useCallback(() => {
+    setIsNavDrawerOpen(false);
+  }, []);
 
   const dismissToast = useCallback((id: number) => {
     const timer = toastTimersRef.current.get(id);
@@ -525,14 +654,32 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia(NAV_DRAWER_MEDIA_QUERY);
+    const closeOnWideViewport = () => {
+      if (!mediaQuery.matches) {
+        closeNavDrawer();
+      }
+    };
+
+    mediaQuery.addEventListener("change", closeOnWideViewport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", closeOnWideViewport);
+    };
+  }, [closeNavDrawer]);
+
+  useEffect(() => {
     if (!isNavDrawerOpen) return;
+    if (!isNavDrawerViewport()) {
+      return;
+    }
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsNavDrawerOpen(false);
+        closeNavDrawer();
       }
     };
 
@@ -542,27 +689,100 @@ export default function Home() {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [isNavDrawerOpen]);
+  }, [closeNavDrawer, isNavDrawerOpen]);
 
-  const tabs = useMemo(
+  const navSections = useMemo<NavSection[]>(
     () => [
-      { id: "operations", label: "矩阵运算", icon: Calculator },
-      { id: "system", label: "线性方程组", icon: Braces },
-      { id: "decomposition", label: "矩阵分解", icon: SplitSquareVertical },
-      { id: "eigen", label: "特征分析", icon: FunctionSquare },
-      { id: "nonlinear", label: "非线性求根", icon: Sigma },
-      { id: "approximation", label: "插值与逼近", icon: LineChart },
-      { id: "integration", label: "数值积分", icon: ChartArea },
-      { id: "ode", label: "微分方程", icon: FunctionSquare },
-      { id: "errorAnalysis", label: "误差分析", icon: AlertTriangle },
+      {
+        title: "数值线性代数",
+        items: [
+          {
+            id: "operations",
+            label: "矩阵运算",
+            description: "基础矩阵计算与 RREF",
+            icon: Calculator,
+          },
+          {
+            id: "system",
+            label: "线性方程组",
+            description: "直接法与迭代法",
+            icon: Braces,
+          },
+          {
+            id: "determinant",
+            label: "行列式",
+            description: "方阵体积因子与可逆性",
+            icon: Sigma,
+          },
+          {
+            id: "decomposition",
+            label: "矩阵分解",
+            description: "LU / QR / Cholesky / SVD",
+            icon: SplitSquareVertical,
+          },
+          {
+            id: "eigen",
+            label: "特征分析",
+            description: "特征值、特征向量与对角化",
+            icon: FunctionSquare,
+          },
+        ],
+      },
+      {
+        title: "方程与逼近",
+        items: [
+          {
+            id: "nonlinear",
+            label: "非线性方程求根",
+            description: "迭代求根与收敛过程",
+            icon: Sigma,
+          },
+          {
+            id: "approximation",
+            label: "插值与逼近",
+            description: "数据点、曲线与误差",
+            icon: LineChart,
+          },
+        ],
+      },
+      {
+        title: "积分与微分方程",
+        items: [
+          {
+            id: "integration",
+            label: "数值积分",
+            description: "求积策略与误差估计",
+            icon: ChartArea,
+          },
+          {
+            id: "ode",
+            label: "常微分方程",
+            description: "初值问题与步进误差",
+            icon: FunctionSquare,
+          },
+        ],
+      },
+      {
+        title: "误差与稳定性",
+        items: [
+          {
+            id: "errorAnalysis",
+            label: "误差分析",
+            description: "条件数、扰动与稳定性",
+            icon: AlertTriangle,
+          },
+        ],
+      },
     ],
     []
   );
 
   const handleTabSwitch = useCallback((tab: TabId) => {
     setActiveTab(tab);
-    setIsNavDrawerOpen(false);
-  }, []);
+    setMatrixComparisonRows([]);
+    setMatrixScanRows([]);
+    closeNavDrawer();
+  }, [closeNavDrawer]);
 
   const syncHistoryState = useCallback(() => {
     const total = historyStackRef.current.length;
@@ -577,7 +797,6 @@ export default function Home() {
 
   const localHistorySnapshot = useMemo<LocalHistorySnapshot>(
     () => ({
-      activeTab,
       showCorrectnessPanel,
       activeOperationTarget,
       determinant: {
@@ -602,7 +821,6 @@ export default function Home() {
     }),
     [
       activeOperationTarget,
-      activeTab,
       decompCols,
       decompMatrix,
       decompMode,
@@ -634,7 +852,6 @@ export default function Home() {
 
       restoreMatrixHistorySnapshot(deepClone(snapshot.matrix));
 
-      setActiveTab(snapshot.local.activeTab);
       setShowCorrectnessPanel(snapshot.local.showCorrectnessPanel);
       setActiveOperationTarget(snapshot.local.activeOperationTarget);
 
@@ -980,6 +1197,46 @@ export default function Home() {
     return "eigen";
   }, [activeTab]);
 
+  const isMatrixWorkspace =
+    activeTab === "operations" ||
+    activeTab === "system" ||
+    activeTab === "determinant" ||
+    activeTab === "decomposition" ||
+    activeTab === "eigen" ||
+    activeTab === "errorAnalysis";
+
+  const activeModuleMeta = useMemo(
+    () =>
+      navSections
+        .flatMap((section) =>
+          section.items.map((item) => ({
+            ...item,
+            sectionTitle: section.title,
+          }))
+        )
+        .find((item) => item.id === activeTab),
+    [activeTab, navSections]
+  );
+
+  const activeNavSection = useMemo(
+    () =>
+      navSections.find((section) =>
+        section.items.some((item) => item.id === activeTab)
+      ) ?? navSections[0],
+    [activeTab, navSections]
+  );
+
+  const handleSectionSwitch = useCallback(
+    (sectionTitle: string) => {
+      const targetSection = navSections.find((section) => section.title === sectionTitle);
+      const firstItem = targetSection?.items[0];
+      if (firstItem) {
+        handleTabSwitch(firstItem.id);
+      }
+    },
+    [handleTabSwitch, navSections]
+  );
+
   const inferMatrixKindByContext = (context: ActiveContext): MatrixKind =>
     context === "linear-system" ? "augmented" : "standard";
 
@@ -1129,6 +1386,335 @@ export default function Home() {
       activeLibraryContext,
       inferMatrixKindByContext(activeLibraryContext)
     );
+  };
+
+  const clearMatrixExperimentOutputs = () => {
+    setMatrixComparisonRows([]);
+    setMatrixScanRows([]);
+  };
+
+  const applyMatrixExperimentCase = (caseId: string) => {
+    clearMatrixExperimentOutputs();
+
+    if (caseId === "ops-inverse") {
+      matrix.operations.setOperation("inverse");
+      matrix.operations.setMatrixA(toInputMatrix([[2, 1, 1], [1, 3, 2], [1, 0, 0]]));
+      setActiveOperationTarget("A");
+      return;
+    }
+
+    if (caseId === "ops-rref") {
+      matrix.operations.setOperation("simplify");
+      matrix.operations.setMatrixA(toInputMatrix([[1, 2, 3], [2, 4, 6], [1, 1, 1]]));
+      setActiveOperationTarget("A");
+      return;
+    }
+
+    if (caseId === "system-unique") {
+      matrix.system.setMethod("gaussianElimination");
+      matrix.system.setAugmentedMatrix(toInputMatrix([[2, 1, -1, 8], [-3, -1, 2, -11], [-2, 1, 2, -3]]));
+      return;
+    }
+
+    if (caseId === "system-iterative") {
+      matrix.system.setMethod("gaussSeidel");
+      matrix.system.setAugmentedMatrix(toInputMatrix([[10, -1, 2, 6], [-1, 11, -1, 25], [2, -1, 10, -11]]));
+      return;
+    }
+
+    if (caseId === "det-singular") {
+      setDetSize(3);
+      setDetMatrix(toInputMatrix([[1, 2, 3], [2, 4, 6], [4, 5, 6]]));
+      setDetResult(null);
+      return;
+    }
+
+    if (caseId === "decomp-spd") {
+      setDecompMode("cholesky");
+      setDecompRows(3);
+      setDecompCols(3);
+      setDecompMatrix(toInputMatrix([[4, 1, 1], [1, 3, 0], [1, 0, 2]]));
+      setDecompResult(null);
+      return;
+    }
+
+    if (caseId === "decomp-rect") {
+      setDecompMode("svd");
+      setDecompRows(4);
+      setDecompCols(3);
+      setDecompMatrix(toInputMatrix([[1, 0, 2], [0, 1, 1], [2, 1, 0], [1, 1, 1]]));
+      setDecompResult(null);
+      return;
+    }
+
+    if (caseId === "eigen-diagonalizable") {
+      setEigSize(3);
+      setEigMatrix(toInputMatrix([[2, 0, 0], [0, 3, 1], [0, 0, 3]]));
+      setEigVectorB(["1", "1", "1"]);
+      setEigResult(null);
+      setEigPerturbationResult(null);
+      return;
+    }
+
+    if (caseId === "eigen-defective") {
+      setEigSize(2);
+      setEigMatrix(toInputMatrix([[2, 1], [0, 2]]));
+      setEigVectorB(["1", "1"]);
+      setEigResult(null);
+      setEigPerturbationResult(null);
+      return;
+    }
+
+    if (caseId === "error-hilbert") {
+      const hilbert = Array.from({ length: 4 }, (_, row) =>
+        Array.from({ length: 4 }, (_, col) => 1 / (row + col + 1))
+      );
+      setEigSize(4);
+      setEigMatrix(toInputMatrix(hilbert));
+      setEigVectorB(["1", "1", "1", "1"]);
+      setEigResult(null);
+      setEigPerturbationResult(null);
+    }
+  };
+
+  const runMatrixComparison = () => {
+    if (activeTab === "system") {
+      const normalized = normalizeMatrixInput(matrix.system.augmented);
+      const rows: ComparisonRow[] = [];
+      const gaussian = solveLinearSystemWithSteps(normalized, matrix.system.cols).summary;
+      rows.push({
+        method: "高斯消元",
+        value: gaussian.type,
+        metric: `rank(A)=${gaussian.rankA}, rank([A|b])=${gaussian.rankAug}`,
+        cost: "步骤回放",
+        tone: gaussian.type === "无解" ? "warning" : "success",
+        note: gaussian.solution ? `x=[${gaussian.solution.join(", ")}]` : "完成",
+      });
+
+      const jordan = solveLinearSystemByGaussJordan(normalized, matrix.system.cols).summary;
+      rows.push({
+        method: "Gauss-Jordan",
+        value: jordan.type,
+        metric: `rank(A)=${jordan.rankA}, rank([A|b])=${jordan.rankAug}`,
+        cost: "RREF",
+        tone: jordan.type === "无解" ? "warning" : "success",
+        note: jordan.solution ? `x=[${jordan.solution.join(", ")}]` : "完成",
+      });
+
+      const numericAugmented = toNumericMatrix(normalized);
+      if (numericAugmented && matrix.system.rows === matrix.system.cols) {
+        const matrixA = numericAugmented.map((row) => row.slice(0, matrix.system.cols));
+        const vectorB = numericAugmented.map((row) => row[matrix.system.cols]);
+        (["jacobi", "gaussSeidel", "sor", "conjugateGradient"] as IterativeMethod[]).forEach((method) => {
+          const solved = solveLinearSystemIterative({
+            method,
+            matrixA,
+            vectorB,
+            tolerance: Number(matrix.system.tolerance) || 1e-10,
+            maxIterations: Number(matrix.system.maxIterations) || 120,
+            omega: method === "sor" ? Number(matrix.system.omega) || 1.1 : undefined,
+          });
+          rows.push({
+            method,
+            value: solved?.solution ? `[${solved.solution.join(", ")}]` : "N/A",
+            metric: solved ? formatResidual(solved.residual) : "N/A",
+            cost: solved ? `${solved.iterations} 次` : "-",
+            tone: solved?.converged ? "success" : "warning",
+            note: solved?.convergenceMessage ?? solved?.note ?? "无法迭代",
+          });
+        });
+      }
+      setMatrixComparisonRows(rows);
+      return;
+    }
+
+    if (activeTab === "decomposition") {
+      const normalized = normalizeMatrixInput(decompMatrix);
+      const rows: ComparisonRow[] = [];
+      const addRow = (
+        method: string,
+        residual: number | null,
+        cost: string,
+        note: string
+      ) => {
+        rows.push({
+          method,
+          value: residual === null ? "N/A" : formatMetric(residual),
+          metric: residual === null ? "N/A" : residual.toExponential(3),
+          cost,
+          tone: residual !== null && residual < RESIDUAL_THRESHOLD ? "success" : "warning",
+          note,
+        });
+      };
+
+      const lu = decompRows === decompCols ? luDecomposition(normalized) : null;
+      if (lu) addRow("LU（带主元）", luResidual(normalized, lu), "方阵", "PA≈LU");
+      const qr = qrDecomposition(normalized);
+      if (qr) addRow("QR", qrResidual(normalized, qr), "任意矩阵", "A≈QR");
+      const svd = svdDecomposition(normalized);
+      if (svd) addRow("SVD", svdResidual(normalized, svd), "任意矩阵", "A≈UΣV^T");
+      const chol = decompRows === decompCols ? choleskyDecomposition(normalized) : null;
+      if (chol) addRow("Cholesky", choleskyResidual(normalized, chol), "SPD 方阵", "A≈LL^T");
+      setMatrixComparisonRows(rows);
+      return;
+    }
+
+    if (activeTab === "eigen" || activeTab === "errorAnalysis") {
+      const normalized = normalizeMatrixInput(eigMatrix);
+      const numeric = toNumericMatrix(normalized);
+      const condition = numeric ? analyzeConditionNumbers(numeric) : null;
+      setMatrixComparisonRows(
+        condition
+          ? [
+              {
+                method: "1-范数条件数",
+                value: formatMetric(condition.cond1),
+                metric: `||A||1=${formatMetric(condition.norm1)}`,
+                cost: "灵敏度",
+                tone: condition.invertible ? "success" : "warning",
+                note: condition.invertible ? "可逆" : "不可逆",
+              },
+              {
+                method: "∞-范数条件数",
+                value: formatMetric(condition.condInf),
+                metric: `||A||∞=${formatMetric(condition.normInf)}`,
+                cost: "灵敏度",
+                tone: condition.invertible ? "success" : "warning",
+                note: condition.invertible ? "可逆" : "不可逆",
+              },
+            ]
+          : []
+      );
+      return;
+    }
+
+    if (activeTab === "determinant") {
+      const normalized = normalizeMatrixInput(detMatrix);
+      setMatrixComparisonRows([
+        {
+          method: "行列式",
+          value: normalized.length === normalized[0]?.length ? determinant(normalized) : "N/A",
+          metric: `${normalized.length}x${normalized[0]?.length ?? 0}`,
+          cost: "方阵判定",
+          tone: normalized.length === normalized[0]?.length ? "success" : "error",
+          note: "det(A)",
+        },
+      ]);
+      return;
+    }
+
+    setMatrixComparisonRows([
+      {
+        method: "当前矩阵运算",
+        value: matrix.operations.feedback?.text ?? "尚未计算",
+        metric: `${matrix.operations.rows}x${matrix.operations.cols}`,
+        cost: matrix.operations.operation,
+        tone: matrix.operations.feedback?.tone ?? "info",
+        note: matrix.operations.resultMatrix ? "已有结果" : "点击计算生成结果",
+      },
+    ]);
+  };
+
+  const runMatrixScan = () => {
+    if (activeTab === "system") {
+      const normalized = normalizeMatrixInput(matrix.system.augmented);
+      const numericAugmented = toNumericMatrix(normalized);
+      if (!numericAugmented || matrix.system.rows !== matrix.system.cols) {
+        setMatrixScanRows([]);
+        return;
+      }
+      const matrixA = numericAugmented.map((row) => row.slice(0, matrix.system.cols));
+      const vectorB = numericAugmented.map((row) => row[matrix.system.cols]);
+      setMatrixScanRows(
+        [1e-2, 1e-4, 1e-6, 1e-8, 1e-10].map((tolerance) => {
+          const solved = solveLinearSystemIterative({
+            method: "gaussSeidel",
+            matrixA,
+            vectorB,
+            tolerance,
+            maxIterations: Number(matrix.system.maxIterations) || 120,
+          });
+          return {
+            parameter: "容差",
+            value: tolerance.toExponential(0),
+            metric: solved ? formatResidual(solved.residual) : "N/A",
+            tone: solved?.converged ? "success" : "warning",
+            note: solved ? `${solved.iterations} 次` : "无法迭代",
+          };
+        })
+      );
+      return;
+    }
+
+    if (activeTab === "eigen" || activeTab === "errorAnalysis") {
+      const numericA = toNumericMatrix(normalizeMatrixInput(eigMatrix));
+      const baselineEigen = numericA ? eigsWithMathjs(numericA) : null;
+      if (!numericA || !baselineEigen) {
+        setMatrixScanRows([]);
+        return;
+      }
+      setMatrixScanRows(
+        [1e-8, 1e-7, 1e-6, 1e-5].map((epsilon) => {
+          const perturbed = perturbNumericMatrix(numericA, epsilon);
+          if (!perturbed) {
+            return {
+              parameter: "扰动 ε",
+              value: epsilon.toExponential(0),
+              metric: "N/A",
+              tone: "error",
+              note: "扰动生成失败",
+            } satisfies ScanRow;
+          }
+          const perturbedEigen = eigsWithMathjs(perturbed);
+          const eigenError = perturbedEigen
+            ? relativeEigenError(baselineEigen.values, perturbedEigen.values)
+            : null;
+          return {
+            parameter: "扰动 ε",
+            value: epsilon.toExponential(0),
+            metric: `relEig=${formatMetric(eigenError)}`,
+            tone: eigenError !== null && eigenError < 1e-3 ? "success" : "warning",
+            note: `relA=${formatMetric(relativeMatrixErrorInfinity(numericA, perturbed))}`,
+          };
+        })
+      );
+      return;
+    }
+
+    if (activeTab === "decomposition") {
+      const normalized = normalizeMatrixInput(decompMatrix);
+      setMatrixScanRows(
+        (["lu", "qr", "svd"] as const).map((mode) => {
+          const residual =
+            mode === "lu"
+              ? decompRows === decompCols
+                ? (() => {
+                    const lu = luDecomposition(normalized);
+                    return lu ? luResidual(normalized, lu) : null;
+                  })()
+                : null
+              : mode === "qr"
+                ? (() => {
+                    const qr = qrDecomposition(normalized);
+                    return qr ? qrResidual(normalized, qr) : null;
+                  })()
+                : (() => {
+                    const svd = svdDecomposition(normalized);
+                    return svd ? svdResidual(normalized, svd) : null;
+                  })();
+          return {
+            parameter: "方法",
+            value: mode.toUpperCase(),
+            metric: residual === null ? "N/A" : residual.toExponential(3),
+            tone: residual !== null && residual < RESIDUAL_THRESHOLD ? "success" : "warning",
+            note: "残差",
+          };
+        })
+      );
+      return;
+    }
+
+    setMatrixScanRows([]);
   };
 
   const pasteDeterminantMatrix = (row: number, col: number, text: string) => {
@@ -1404,6 +1990,17 @@ export default function Home() {
     };
   }, [decompResult]);
 
+  const detCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
+    if (!detResult) return null;
+    return {
+      title: "行列式验证",
+      equation: "det(A)",
+      passed: true,
+      metrics: [{ label: "det(A)", value: matrix.formatValue(detResult) }],
+      note: "行列式由精确表达式链路计算，可用于可逆性初判。",
+    };
+  }, [detResult, matrix]);
+
   const eigenCorrectness = useMemo<CorrectnessDescriptor | null>(() => {
     if (!eigResult) return null;
 
@@ -1429,6 +2026,115 @@ export default function Home() {
         : "几何重数不足，矩阵不可对角化（该结论本身是有效结果）。",
     };
   }, [eigResult]);
+
+  const activeCorrectnessDescriptor =
+    activeTab === "operations"
+      ? operationCorrectness
+      : activeTab === "system"
+        ? systemCorrectness
+        : activeTab === "determinant"
+          ? detCorrectness
+          : activeTab === "decomposition"
+            ? decompCorrectness
+            : activeTab === "eigen" || activeTab === "errorAnalysis"
+              ? eigenCorrectness
+              : null;
+
+  const matrixReliabilityItems = useMemo<ReliabilityItem[]>(() => {
+    const items: ReliabilityItem[] = [];
+    const descriptor = activeCorrectnessDescriptor;
+
+    if (descriptor) {
+      items.push({
+        label: descriptor.title,
+        tone:
+          descriptor.passed === true
+            ? "success"
+            : descriptor.passed === false
+              ? "warning"
+              : "info",
+        detail:
+          descriptor.residual !== undefined && descriptor.residual !== null
+            ? `${descriptor.equation ?? "残差"} = ${formatMetric(descriptor.residual)}`
+            : descriptor.note ?? descriptor.equation ?? "已生成验证信息。",
+      });
+    } else {
+      items.push({
+        label: "等待计算",
+        tone: "info",
+        detail: "点击当前模块的计算按钮后，这里会显示残差、秩、条件数或收敛性检查。",
+      });
+    }
+
+    if (activeTab === "system" && matrix.system.iterativeResult) {
+      items.push({
+        label: "迭代收敛性",
+        tone: matrix.system.iterativeResult.converged ? "success" : "warning",
+        detail: matrix.system.iterativeResult.convergenceMessage ?? "已完成迭代法判定。",
+      });
+    }
+
+    if ((activeTab === "eigen" || activeTab === "errorAnalysis") && eigenCondition) {
+      items.push({
+        label: "条件数",
+        tone:
+          !eigenCondition.invertible
+            ? "error"
+            : (eigenCondition.condInf ?? 0) > 1e6
+              ? "warning"
+              : "success",
+        detail: `cond∞(A)=${formatMetric(eigenCondition.condInf)}，cond1(A)=${formatMetric(eigenCondition.cond1)}。`,
+      });
+    }
+
+    if (activeTab === "decomposition" && decompResult) {
+      items.push({
+        label: "分解适用性",
+        tone: decompResult.passed === false ? "warning" : "success",
+        detail:
+          decompResult.mode === "cholesky"
+            ? "Cholesky 要求矩阵对称正定。"
+            : decompResult.mode === "svd"
+              ? "SVD 可用于任意数值矩阵，适合稳定性分析。"
+              : "当前分解已生成残差证据。",
+      });
+    }
+
+    return items;
+  }, [
+    activeCorrectnessDescriptor,
+    activeTab,
+    decompResult,
+    eigenCondition,
+    matrix.system.iterativeResult,
+  ]);
+
+  const matrixExperimentSummary = useMemo(() => {
+    if (activeTab === "system" && matrix.system.summary) {
+      return `线性方程组：${matrix.system.summary.type}`;
+    }
+    if (activeTab === "decomposition" && decompResult) {
+      return `矩阵分解：${decompResult.mode}, residual=${formatMetric(decompResult.residual)}`;
+    }
+    if ((activeTab === "eigen" || activeTab === "errorAnalysis") && eigenCondition) {
+      return `误差/特征实验：cond∞=${formatMetric(eigenCondition.condInf)}`;
+    }
+    if (activeTab === "determinant" && detResult) {
+      return `行列式：det(A)=${detResult}`;
+    }
+    if (activeTab === "operations" && matrix.operations.feedback) {
+      return `矩阵运算：${matrix.operations.feedback.text}`;
+    }
+    return `${activeModuleMeta?.label ?? "矩阵实验"}配置`;
+  }, [
+    activeModuleMeta?.label,
+    activeTab,
+    decompResult,
+    detResult,
+    eigenCondition,
+    matrix.operations.feedback,
+    matrix.system.summary,
+  ]);
 
   useEffect(() => {
     if (!matrix.operations.feedback) return;
@@ -1484,7 +2190,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsNavDrawerOpen(true)}
+              onClick={openNavDrawer}
               className="step-control lg:hidden"
               aria-label="打开导航菜单"
             >
@@ -1492,7 +2198,7 @@ export default function Home() {
               菜单
             </button>
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
-              线性代数工作室
+              数值分析实验室
             </div>
           </div>
           <Link href="/about" className="step-control" aria-label="打开关于页面">
@@ -1504,20 +2210,39 @@ export default function Home() {
           数值分析工作台
         </h1>
         <p className="max-w-3xl text-base text-slate-700">
-          支持线性代数计算、非线性方程求根、插值逼近、数值积分、微分方程、迭代过程追踪与正确性校验。
+          按数值分析学习路径组织功能：从数值线性代数出发，继续探索非线性方程、插值逼近、数值积分、常微分方程，以及误差与稳定性分析。
         </p>
+        <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white/80 p-2">
+          {navSections.map((section) => {
+            const isActive = section.title === activeNavSection?.title;
+            return (
+              <button
+                key={section.title}
+                type="button"
+                onClick={() => handleSectionSwitch(section.title)}
+                className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                  isActive
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                {section.title}
+              </button>
+            );
+          })}
+        </div>
       </header>
 
-      <div className="mx-auto mt-8 grid w-full max-w-6xl gap-6 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto mt-8 grid w-full max-w-6xl gap-6 lg:grid-cols-[300px_1fr]">
         <button
           type="button"
           className={`fixed inset-0 z-40 transition-opacity duration-300 lg:hidden ${
             isNavDrawerOpen
-              ? "pointer-events-auto bg-slate-900/35 opacity-100 backdrop-blur-[1.5px]"
+              ? "pointer-events-auto bg-slate-900/35 opacity-100"
               : "pointer-events-none opacity-0"
           }`}
           aria-label="关闭导航菜单"
-          onClick={() => setIsNavDrawerOpen(false)}
+          onClick={closeNavDrawer}
         />
 
         <aside
@@ -1529,7 +2254,7 @@ export default function Home() {
             <div className="text-sm font-semibold text-slate-700">导航菜单</div>
             <button
               type="button"
-              onClick={() => setIsNavDrawerOpen(false)}
+              onClick={closeNavDrawer}
               className="step-control"
               aria-label="关闭导航菜单"
             >
@@ -1538,73 +2263,211 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">导航</div>
-          <div className="grid gap-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
+          <div className="space-y-3">
+            <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              {SIDEBAR_TOOL_TABS.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => handleTabSwitch(tab.id as TabId)}
-                  className={`nav-tab ${activeTab === tab.id ? "nav-tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setSidebarToolTab(tab.id)}
+                  className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-xs font-semibold transition ${
+                    sidebarToolTab === tab.id
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
                 >
-                  <Icon size={16} />
                   {tab.label}
                 </button>
-              );
-            })}
-          </div>
-          <DisplayModeSwitcher displayMode={matrix.displayMode} onChange={matrix.setDisplayMode} />
-          <CorrectnessPanelToggleCard
-            enabled={showCorrectnessPanel}
-            onToggle={setShowCorrectnessPanel}
-          />
-          {activeTab !== "nonlinear" &&
-          activeTab !== "approximation" &&
-          activeTab !== "integration" &&
-          activeTab !== "ode" ? (
-            <>
-              <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    当前输入
-                  </div>
-                  <SaveToLibraryButton
-                    defaultName={suggestNameForContext(matrixInventory, activeLibraryContext)}
-                    onSave={handleSaveCurrentInputToLibrary}
-                  />
+              ))}
+            </div>
+
+            {sidebarToolTab === "nav" ? (
+              <div className="space-y-2">
+                <div className="px-1 text-[11px] font-semibold tracking-wide text-slate-500">
+                  {activeNavSection.title}
                 </div>
-                <div className="mt-2 text-[11px] text-slate-500">
-                  {activeLibraryContext === "matrix-operations"
-                    ? `当前活动输入位：${activeOperationTarget}`
-                    : "可将当前编辑矩阵保存到矩阵库。"}
+                <div className="grid gap-2">
+                  {activeNavSection.items.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => handleTabSwitch(tab.id)}
+                        className={`nav-tab ${activeTab === tab.id ? "nav-tab-active" : ""}`}
+                      >
+                        <Icon size={16} className="shrink-0" />
+                        <span className="min-w-0">
+                          <span className="block">{tab.label}</span>
+                          <span
+                            className={`block text-[11px] font-medium ${
+                              activeTab === tab.id ? "text-slate-200" : "text-slate-500"
+                            }`}
+                          >
+                            {tab.description}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <MatrixShelf
-                items={matrixInventory}
-                activeMatrixId={activeMatrixId}
-                onActivate={handleActivateInventoryMatrix}
-                onDelete={deleteInventoryMatrix}
-                onRename={renameInventoryMatrix}
-                onSmartImport={handleSmartImportMatrix}
-              />
-            </>
-          ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-500">
-              当前模块使用函数表达式或数据点，矩阵库会在切回线性代数模块后继续可用。
-            </div>
-          )}
-          <HistoryControlCard
-            canUndo={historyState.canUndo}
-            canRedo={historyState.canRedo}
-            index={historyState.index}
-            total={historyState.total}
-            onUndo={undoHistory}
-            onRedo={redoHistory}
-          />
+            ) : null}
+
+            {!isMatrixWorkspace ? (
+              <>
+                <div
+                  id="module-sidebar-cases"
+                  className={sidebarToolTab === "cases" ? "space-y-3" : "hidden"}
+                />
+                <div
+                  id="module-sidebar-params"
+                  className={sidebarToolTab === "params" ? "space-y-3" : "hidden"}
+                />
+                <div
+                  id="module-sidebar-verify"
+                  className={sidebarToolTab === "verify" ? "space-y-3" : "hidden"}
+                />
+                <div
+                  id="module-sidebar-data"
+                  className={sidebarToolTab === "data" ? "space-y-3" : "hidden"}
+                />
+              </>
+            ) : (
+              <>
+                {sidebarToolTab === "cases" ? (
+                  <>
+                    <ExperimentCasePanel
+                      cases={MATRIX_EXPERIMENT_CASES[activeTab] ?? []}
+                      onApply={applyMatrixExperimentCase}
+                    />
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        实验工具
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={runMatrixComparison}
+                          className="step-control justify-center"
+                        >
+                          方法对比
+                        </button>
+                        <button
+                          type="button"
+                          onClick={runMatrixScan}
+                          className="step-control justify-center"
+                        >
+                          参数扫描
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {sidebarToolTab === "params" ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      矩阵输入
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-slate-500">
+                      矩阵表格需要更宽的编辑空间，因此保留在主工作区；这里集中放置案例、验证与数据管理。
+                    </div>
+                  </div>
+                ) : null}
+
+                {sidebarToolTab === "verify" ? (
+                  <>
+                    <ReliabilityPanel items={matrixReliabilityItems} />
+                    <DisplayModeSwitcher
+                      displayMode={matrix.displayMode}
+                      onChange={matrix.setDisplayMode}
+                    />
+                    <CorrectnessPanelToggleCard
+                      enabled={showCorrectnessPanel}
+                      onToggle={setShowCorrectnessPanel}
+                    />
+                  </>
+                ) : null}
+
+                {sidebarToolTab === "data" ? (
+                  <>
+                    <SaveExperimentButton
+                      module={
+                        activeTab === "errorAnalysis"
+                          ? "error-analysis"
+                          : activeTab === "operations" ||
+                              activeTab === "system" ||
+                              activeTab === "determinant" ||
+                              activeTab === "decomposition" ||
+                              activeTab === "eigen"
+                            ? "linear-algebra"
+                            : "linear-algebra"
+                      }
+                      defaultName={activeModuleMeta?.label ?? "数值线性代数实验"}
+                      summary={matrixExperimentSummary}
+                      payload={{
+                        activeTab,
+                        matrixSnapshot: matrixHistorySnapshot,
+                        determinant: { detSize, detMatrix, detResult },
+                        decomposition: { decompMode, decompRows, decompCols, decompMatrix, decompResult },
+                        eigen: { eigSize, eigMatrix, eigResult, eigVectorB, eigPerturbationResult },
+                        comparisonRows: matrixComparisonRows,
+                        scanRows: matrixScanRows,
+                      }}
+                      disabled={
+                        !activeCorrectnessDescriptor &&
+                        matrixComparisonRows.length === 0 &&
+                        matrixScanRows.length === 0
+                      }
+                    />
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          矩阵实验数据
+                        </div>
+                        <SaveToLibraryButton
+                          defaultName={suggestNameForContext(matrixInventory, activeLibraryContext)}
+                          onSave={handleSaveCurrentInputToLibrary}
+                        />
+                      </div>
+                      <div className="mt-2 text-[11px] text-slate-500">
+                        {activeLibraryContext === "matrix-operations"
+                          ? `当前活动输入位：${activeOperationTarget}`
+                          : "可将当前编辑矩阵保存到矩阵库，继续用于后续数值线性代数或误差实验。"}
+                      </div>
+                    </div>
+                    <MatrixShelf
+                      items={matrixInventory}
+                      activeMatrixId={activeMatrixId}
+                      onActivate={handleActivateInventoryMatrix}
+                      onDelete={deleteInventoryMatrix}
+                      onRename={renameInventoryMatrix}
+                      onSmartImport={handleSmartImportMatrix}
+                    />
+                    <HistoryControlCard
+                      canUndo={historyState.canUndo}
+                      canRedo={historyState.canRedo}
+                      index={historyState.index}
+                      total={historyState.total}
+                      onUndo={undoHistory}
+                      onRedo={redoHistory}
+                    />
+                  </>
+                ) : null}
+              </>
+            )}
+          </div>
         </aside>
 
         <div>
+          {isMatrixWorkspace && (matrixComparisonRows.length > 0 || matrixScanRows.length > 0) ? (
+            <div className="mb-6 space-y-6">
+              <MethodComparisonTable rows={matrixComparisonRows} />
+              <ParameterScanTable title="矩阵实验参数扫描" rows={matrixScanRows} />
+            </div>
+          ) : null}
+
           {activeTab === "operations" && (
             <div className="workspace-container">
               <div className="workspace-grid">
@@ -2520,7 +3383,7 @@ export default function Home() {
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
 
       <footer className="mx-auto mt-10 w-full max-w-6xl rounded-3xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-500">
-        以矩阵为中心的工作流 · 默认启用列选主元
+        数值分析工作流 · 默认启用可验证计算
       </footer>
     </div>
   );

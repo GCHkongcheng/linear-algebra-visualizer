@@ -18,17 +18,17 @@ const copy = {
   back: "\u8fd4\u56de\u5de5\u4f5c\u53f0",
   title: "\u5173\u4e8e\u9879\u76ee",
   metaDesc:
-    "\u7ebf\u6027\u4ee3\u6570\u5de5\u4f5c\u5ba4\u7684\u9879\u76ee\u80cc\u666f\u3001\u6280\u672f\u6808\u4e0e\u5f00\u53d1\u8005\u8bf4\u660e\u3002",
+    "数值分析工作台的项目背景、技术栈与开发者说明。",
   shareDesc:
     "\u4e86\u89e3\u9879\u76ee\u521d\u8877\u3001\u6280\u672f\u6808\u548c\u5f00\u53d1\u8005\u8054\u7cfb\u65b9\u5f0f\u3002",
   sectionOrigin: "\u9879\u76ee\u521d\u8877",
-  sectionStack: "\u6280\u672f\u6808\uff08Next.js, Tailwind, Math.js\uff09",
+  sectionStack: "技术栈（Next.js, Tailwind, Math.js）",
   sectionDev: "\u5f00\u53d1\u8005\u8bf4\u660e",
   sectionContact: "\u5f00\u53d1\u8005\u8054\u7cfb",
   paragraphOrigin:
-    "\u57fa\u4e8e\u6709\u5173\u77e9\u9635\u7684\u8fd0\u7b97\u8f83\u4e3a\u590d\u6742\uff0c\u8fd9\u4e2a\u9879\u76ee\u5e0c\u671b\u628a\u7ebf\u6027\u4ee3\u6570\u4e2d\u7684\u62bd\u8c61\u6982\u5ff5\u8f6c\u5316\u4e3a\u53ef\u4ea4\u4e92\u3001\u53ef\u8ffd\u8e2a\u3001\u53ef\u9a8c\u8bc1\u7684\u8ba1\u7b97\u6d41\u7a0b\uff0c\u5e2e\u52a9\u5b66\u4e60\u8005\u4e0e\u5de5\u7a0b\u573a\u666f\u66f4\u7a33\u5b9a\u5730\u5f97\u5230\u53ef\u4fe1\u7ed3\u679c\u3002",
+    "数值分析里的很多概念并不只关心最终答案，还关心算法是否稳定、误差如何传播、迭代为什么收敛。这个项目希望把矩阵计算、方程求根、插值逼近、积分与微分方程等流程转化为可交互、可追踪、可验证的计算体验。",
   paragraphStack:
-    "\u7cfb\u7edf\u57fa\u4e8e Next.js \u6784\u5efa\u8def\u7531\u4e0e\u9875\u9762\uff0c\u4f7f\u7528 Tailwind CSS \u7ec4\u7ec7\u6837\u5f0f\uff0c\u5e76\u901a\u8fc7 Math.js \u63d0\u4f9b\u7ebf\u6027\u4ee3\u6570\u8ba1\u7b97\u80fd\u529b\u3002",
+    "系统基于 Next.js 构建路由与页面，使用 Tailwind CSS 组织样式，并通过 Math.js 与自定义数值算法模块提供矩阵计算、非线性方程、插值逼近、数值积分和常微分方程求解能力。",
   paragraphDev:
     "\u9879\u76ee\u6301\u7eed\u4ee5\u201c\u8ba1\u7b97\u6b63\u786e\u6027 + \u53ef\u89e3\u91ca\u6027\u201d\u4e3a\u7b2c\u4e00\u4f18\u5148\u7ea7\u3002\u5982\u679c\u4f60\u53d1\u73b0\u7ed3\u679c\u5f02\u5e38\u6216\u5e0c\u671b\u65b0\u589e\u529f\u80fd\uff0c\u6b22\u8fce\u901a\u8fc7\u4e0b\u65b9\u8054\u7cfb\u65b9\u5f0f\u53cd\u9988\u3002\u53e6\u5916\uff0c\u5982\u679c\u4f60\u559c\u6b22\u8fd9\u4e2a\u9879\u76ee\uff0c\u8bf7\u70b9\u4e00\u4e2astar~",
   blogPrefix:
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     canonical: "/about",
   },
   openGraph: {
-    title: `${copy.title} | 线性代数工作台`,
+    title: `${copy.title} | 数值分析工作台`,
     description: copy.shareDesc,
     url: `${getSiteUrl()}/about`,
     siteName: siteConfig.name,
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${copy.title} | 线性代数工作台`,
+    title: `${copy.title} | 数值分析工作台`,
     description: copy.shareDesc,
   },
 };
@@ -98,7 +98,7 @@ export default async function AboutPage() {
         </header>
 
         <article className="prose prose-slate max-w-none rounded-3xl border border-slate-200 bg-white/90 px-6 py-7 shadow-sm">
-          <h1>线性代数工作台</h1>
+          <h1>数值分析工作台</h1>
 
           <h2>{copy.sectionOrigin}</h2>
           <p>{copy.paragraphOrigin}</p>

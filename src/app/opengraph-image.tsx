@@ -37,7 +37,7 @@ export default function OpenGraphImage() {
             color: "#c2410c",
           }}
         >
-          线性代数工作室
+          数值分析实验室
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -45,7 +45,7 @@ export default function OpenGraphImage() {
             {siteConfig.name}
           </div>
           <div style={{ fontSize: 32, color: "#334155", maxWidth: 980 }}>
-            矩阵运算 · 方程组求解 · 分解与特征分析
+            线性代数 · 方程求根 · 插值积分 · 微分方程
           </div>
         </div>
 

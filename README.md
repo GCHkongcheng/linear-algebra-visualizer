@@ -1,48 +1,68 @@
-﻿# Linear Algebra Studio
+# Numerical Analysis Studio
 
 预览网址：[math.gchkc.top](https://math.gchkc.top)
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/GCHkongcheng/linear-algebra-visualizer?style=social)](https://github.com/GCHkongcheng/linear-algebra-visualizer/stargazers)
 
-一个面向学习与工程实践的线性代数可视化工具。项目聚焦三件事：
+一个面向学习与工程实践的数值分析可视化工作台。项目聚焦三件事：
 
-- 结果正确：核心算法提供残差与一致性校验，避免“看起来对”但实际错误。
-- 过程可解释：支持步骤回放、主元交换原因说明、解类型判定。
-- 数据可复用：通过全局矩阵库实现跨模块流转与链式计算。
+- 结果正确：核心算法提供残差、一致性校验与误差指标，避免“看起来对”但实际不可靠。
+- 过程可解释：支持步骤回放、迭代历史、收敛提示、主元交换原因说明与解类型判定。
+- 数据可复用：通过全局矩阵库实现跨模块流转，支持从线性代数计算继续进入误差分析与链式实验。
 
 ## 功能总览
 
-### 1. 矩阵运算
+### 1. 数值线性代数
 
 - 支持 `A+B`、`A-B`、`A*B`、`A^-1`、`A^2`、`转置`、`RREF`、`数乘`
 - 支持 `秩` 与 `行列式`，并在结果区展示具体数值
-- 输入支持分数、整数、小数与符号表达（显示模式可切换）
-
-### 2. 线性方程组
-
-- 解法支持：
-- `高斯消元`
-- `高斯-约旦`
-- `Jacobi`
-- `Gauss-Seidel`
-- `SOR`
-- `共轭梯度法`
+- 支持线性方程组求解：`高斯消元`、`高斯-约旦`、`Jacobi`、`Gauss-Seidel`、`SOR`、`共轭梯度法`
 - 自动判定解类型：`无解 / 唯一解 / 无穷多解`
 - 输出 `rank(A)` 与 `rank([A|b])`
-- 无穷多解支持参数化表达
 - 迭代法自动计算谱半径 `ρ(B)`，给出“是否保证收敛”的判定提示
 
-### 3. 矩阵分解与特征分析
+### 2. 矩阵分解与特征分析
 
-- 分解支持：`LU（带主元）`、`QR（Householder）`、`Cholesky`
+- 分解支持：`LU（带主元）`、`LU（普通）`、`QR（Householder）`、`Cholesky`、`SVD`
 - 显示并校验分解残差：
 - LU：`maxAbs(PA - LU)`
 - QR：`maxAbs(A - QR)` 与 `maxAbs(Q^TQ - I)`
 - Cholesky：`maxAbs(A - LL^T)`
+- SVD：`maxAbs(A - UΣV^T)` 与正交性残差
 - 特征分析支持复数特征值与特征向量配对展示（`λi ↔ vi`）
 - 缺陷矩阵可识别并提示不可对角化
 
-### 4. 全局矩阵库（Matrix Library）
+### 3. 非线性方程求根
+
+- 支持常见一元非线性方程求根流程
+- 展示迭代历史、误差变化与收敛状态
+- 支持函数曲线与迭代点可视化，帮助理解初值、区间和步长对结果的影响
+
+### 4. 插值与逼近
+
+- 支持数据点输入与函数逼近实验
+- 展示插值曲线、原始数据点和误差趋势
+- 适合观察不同节点、阶数与采样密度对数值结果的影响
+
+### 5. 数值积分
+
+- 支持典型数值积分实验
+- 展示积分结果、误差估计与计算过程
+- 适合比较不同求积策略在平滑函数、振荡函数或局部变化较大函数上的表现
+
+### 6. 常微分方程数值解
+
+- 支持 ODE 初值问题的数值求解
+- 展示数值解曲线、步进数据与误差指标
+- 可用于比较步长、方法与精确解之间的差异
+
+### 7. 误差与稳定性分析
+
+- 支持条件数、矩阵扰动、向量扰动与相对误差对比
+- 可观察病态矩阵、近奇异矩阵和扰动放大现象
+- 将“算出答案”升级为“解释答案是否可信”
+
+### 8. 全局矩阵库（Matrix Library）
 
 - 使用 Zustand 全局状态管理
 - 支持保存、重命名、删除、设为当前活动矩阵
@@ -50,7 +70,7 @@
 - localStorage 持久化，刷新后不丢失
 - 结果区可“一键存入库”，用于下一步链式计算
 
-### 5. 智能识别（Smart Import）
+### 9. 智能识别（Smart Import）
 
 - 侧边栏提供“智能识别”入口
 - 支持文本格式快速导入，例如：`1,1;2,2;3,3`
@@ -58,11 +78,11 @@
 - 支持拍照/扫码导入（浏览器支持 `BarcodeDetector` 时）
 - 导入后先进入可编辑预览，再保存到矩阵库
 
-### 6. 交互与体验
+### 10. 交互与体验
 
 - Container-based 响应式布局
 - 移动端矩阵输入支持内部平滑横向滚动，避免整页溢出
-- 侧边栏矩阵预览支持大矩阵滚动查看，不再截断 3x4
+- 侧边栏矩阵预览支持大矩阵滚动查看
 - 运算、求解、分解状态统一 Toast 反馈
 
 ## 技术栈
@@ -83,14 +103,19 @@ src/
     robots.ts                # robots
     sitemap.ts               # sitemap
     manifest.ts              # Web App Manifest
-  components/matrix/
-    MatrixGrid.tsx           # 矩阵网格（编辑/展示）
-    MatrixShelf.tsx          # 矩阵库 + 智能识别
-    SaveToLibraryButton.tsx  # 结果存库
-    StepCard.tsx             # 步骤卡片
-    ToastHost.tsx            # 全局 Toast
-  hooks/useMatrix.ts         # 主业务编排 Hook
-  lib/matrix-core.ts         # 核心算法与数值逻辑
+  components/
+    approximation/           # 插值与逼近面板
+    integration/             # 数值积分面板
+    nonlinear/               # 非线性方程求根面板
+    ode/                     # 常微分方程面板
+    matrix/                  # 矩阵输入、矩阵库、步骤与 Toast
+  hooks/useMatrix.ts         # 矩阵与线性方程组业务编排
+  lib/
+    matrix-core.ts           # 数值线性代数核心逻辑
+    nonlinear-core.ts        # 非线性方程核心逻辑
+    approximation-core.ts    # 插值与逼近核心逻辑
+    integration-core.ts      # 数值积分核心逻辑
+    ode-core.ts              # ODE 核心逻辑
   store/matrix-library.ts    # 全局矩阵库状态
 ```
 
@@ -162,8 +187,9 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.vercel.app
 
 ## 项目目标
 
-- 让线性代数计算“可视、可证、可复用”
+- 让数值分析计算“可视、可证、可复用”
 - 在保证数学正确性的前提下，持续优化交互效率
+- 帮助用户理解算法条件、误差传播、收敛性与结果可信度
 
 ## 联系方式
 

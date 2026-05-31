@@ -23,6 +23,13 @@ import {
   uniformNodes,
 } from "@/lib/approximation-core";
 import { CoordinatePlot } from "@/components/common/CoordinatePlot";
+import {
+  ExperimentCasePanel,
+  ReliabilityPanel,
+  SaveExperimentButton,
+} from "@/components/common/ExperimentTools";
+import { ModuleSidebarPortal } from "@/components/common/ModuleSidebarPortal";
+import type { ExperimentCase, ReliabilityItem } from "@/types/experiment";
 import type {
   ApproximationMethod,
   ApproximationResult,
@@ -57,12 +64,102 @@ const INITIAL_POINTS: EditablePoint[] = [
   { id: "p-3", x: "3", y: "10", derivative: "6" },
 ];
 
+const EXPERIMENT_CASES: ExperimentCase[] = [
+  {
+    id: "runge",
+    title: "Runge 现象",
+    description: "载入 1/(1+25x^2)，用于比较等距节点和 Chebyshev 节点。",
+    tag: "经典",
+  },
+  {
+    id: "least-squares",
+    title: "最小二乘拟合",
+    description: "载入带轻微偏差的数据点，观察拟合残差和 R²。",
+    tag: "拟合",
+  },
+  {
+    id: "hermite",
+    title: "Hermite 插值",
+    description: "载入带导数的数据点，观察函数值与导数约束。",
+    tag: "导数",
+  },
+];
+
 function makePointId(): string {
   return `p-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
 function methodLabel(method: ApproximationMethod): string {
   return METHOD_OPTIONS.find((item) => item.id === method)?.label ?? method;
+}
+
+function editablePointsFromRows(rows: Array<{ x: string; y: string; derivative?: string }>): EditablePoint[] {
+  return rows.map((point) => ({
+    id: makePointId(),
+    x: point.x,
+    y: point.y,
+    derivative: point.derivative ?? "0",
+  }));
+}
+
+function buildReliability(
+  inputMode: "points" | "function",
+  result: ApproximationResult | null,
+  functionResult: FunctionExperimentResult | null,
+  validPointCount: number
+): ReliabilityItem[] {
+  if (inputMode === "function" && functionResult) {
+    const worst = functionResult.metrics.reduce(
+      (max, item) => Math.max(max, item.maxError),
+      0
+    );
+    return [
+      {
+        label: "函数实验",
+        tone: "success",
+        detail: functionResult.summary,
+      },
+      {
+        label: "最大误差",
+        tone: worst < 1e-4 ? "success" : worst < 1e-1 ? "warning" : "error",
+        detail: `当前实验最大误差约为 ${formatApproxNumber(worst)}。`,
+      },
+    ];
+  }
+
+  if (result) {
+    return [
+      {
+        label: "数据规模",
+        tone: result.points.length >= 2 ? "success" : "error",
+        detail: `当前使用 ${result.points.length} 个数据点。`,
+      },
+      {
+        label: "拟合误差",
+        tone: result.metrics.rmse < 1e-8 ? "success" : result.metrics.rmse < 1e-2 ? "warning" : "info",
+        detail: `RMSE = ${formatApproxNumber(result.metrics.rmse)}，SSE = ${formatApproxNumber(result.metrics.sse)}。`,
+      },
+      {
+        label: "方法适用性",
+        tone: result.method === "leastSquaresPolynomial" ? "info" : "success",
+        detail:
+          result.method === "leastSquaresPolynomial"
+            ? "最小二乘适合带噪声数据；若需要穿过所有节点，可切换插值方法。"
+            : "插值方法会尽量满足节点约束；高阶等距插值需注意 Runge 现象。",
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "等待计算",
+      tone: validPointCount >= 2 ? "info" : "warning",
+      detail:
+        validPointCount >= 2
+          ? "已有足够数据点，可计算插值/逼近结果。"
+          : "至少需要两个有效数据点。",
+    },
+  ];
 }
 
 function ApproximationPlot({
@@ -206,19 +303,55 @@ export function ApproximationPanel() {
     : 10;
   const automaticChebyshevCount = normalizedParts + 1;
   const showDerivativeColumn = inputMode === "points" && method === "hermite";
-  const dataPointCardSpacing = "space-y-3";
-  const dataPointTableClass = `w-full text-left text-xs ${
-    showDerivativeColumn ? "min-w-[440px]" : "min-w-[360px]"
-  }`;
-  const dataPointCellClass = "px-2 py-1.5";
   const dataPointInputClass = "studio-input h-8 min-w-0 px-2 font-mono text-xs";
   const pasteAreaClass =
     "min-h-16 rounded-xl border border-slate-200 bg-white px-2 py-2 font-mono text-xs text-slate-700 outline-none focus:border-orange-400";
   const experimentButtonClass =
-    "inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700";
+    "inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700";
 
   const parsedDataPoints = useMemo(() => parseDataPointRows(points), [points]);
   const validPointCount = parsedDataPoints.length;
+  const reliability = buildReliability(inputMode, result, functionResult, validPointCount);
+
+  const applyCase = (caseId: string) => {
+    if (caseId === "runge") {
+      setInputMode("function");
+      setFunctionExpression("1 / (1 + 25 * x^2)");
+      setIntervalStart("-1");
+      setIntervalEnd("1");
+      setParts("10");
+      setFunctionDegree("8");
+      setMethod("lagrange");
+    } else if (caseId === "least-squares") {
+      setInputMode("points");
+      setMethod("leastSquaresPolynomial");
+      setDegree("2");
+      setQueryText("0.5 1.5 2.5");
+      setPoints(
+        editablePointsFromRows([
+          { x: "0", y: "1" },
+          { x: "1", y: "2.1" },
+          { x: "2", y: "4.8" },
+          { x: "3", y: "10.2" },
+          { x: "4", y: "16.1" },
+        ])
+      );
+    } else {
+      setInputMode("points");
+      setMethod("hermite");
+      setQueryText("0.5 1.5");
+      setPoints(
+        editablePointsFromRows([
+          { x: "0", y: "0", derivative: "1" },
+          { x: "1", y: "0.8414709848", derivative: "0.5403023059" },
+          { x: "2", y: "0.9092974268", derivative: "-0.4161468365" },
+        ])
+      );
+    }
+    setResult(null);
+    setFunctionResult(null);
+    setFeedback(null);
+  };
 
   const updatePoint = (id: string, key: "x" | "y" | "derivative", value: string) => {
     setPoints((prev) =>
@@ -330,9 +463,13 @@ export function ApproximationPanel() {
   };
 
   return (
-    <div className="workspace-container">
-      <div className="workspace-grid">
-        <section className="space-y-6">
+    <>
+      <ModuleSidebarPortal tab="cases">
+        <ExperimentCasePanel cases={EXPERIMENT_CASES} onApply={applyCase} />
+      </ModuleSidebarPortal>
+
+      <ModuleSidebarPortal tab="params">
+        <div className="space-y-3">
           <div className="studio-card space-y-3">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               输入模式
@@ -356,50 +493,50 @@ export function ApproximationPanel() {
           </div>
 
           {inputMode === "points" ? (
-          <div className="studio-card space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-                <LineChart size={18} />
-                插值与函数逼近
-              </h2>
-              <button type="button" onClick={compute} className="studio-primary-btn inline-flex items-center gap-2">
-                <Play size={14} />
-                计算
-              </button>
-            </div>
+            <div className="studio-card space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                  <LineChart size={18} />
+                  插值参数
+                </h2>
+                <button type="button" onClick={compute} className="studio-primary-btn inline-flex items-center gap-2">
+                  <Play size={14} />
+                  计算
+                </button>
+              </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <label className="space-y-1 text-sm font-medium text-slate-700">
-                方法
-                <select value={method} onChange={(event) => setMethod(event.target.value as ApproximationMethod)} className="studio-select w-full">
-                  {METHOD_OPTIONS.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1 text-sm font-medium text-slate-700">
-                多项式次数
-                <input
-                  value={degree}
-                  onChange={(event) => setDegree(event.target.value)}
-                  disabled={!activeMethod.needsDegree}
-                  className="studio-input font-mono disabled:bg-slate-100 disabled:text-slate-400"
-                />
-              </label>
-              <label className="space-y-1 text-sm font-medium text-slate-700">
-                查询 x
-                <input value={queryText} onChange={(event) => setQueryText(event.target.value)} className="studio-input font-mono" />
-              </label>
+              <div className="grid gap-3">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  方法
+                  <select value={method} onChange={(event) => setMethod(event.target.value as ApproximationMethod)} className="studio-select w-full">
+                    {METHOD_OPTIONS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  多项式次数
+                  <input
+                    value={degree}
+                    onChange={(event) => setDegree(event.target.value)}
+                    disabled={!activeMethod.needsDegree}
+                    className="studio-input font-mono disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </label>
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  查询 x
+                  <input value={queryText} onChange={(event) => setQueryText(event.target.value)} className="studio-input font-mono" />
+                </label>
+              </div>
             </div>
-          </div>
           ) : (
             <div className="studio-card space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <LineChart size={18} />
-                  函数实验
+                  函数实验参数
                 </h2>
                 <button
                   type="button"
@@ -420,7 +557,7 @@ export function ApproximationPanel() {
                 />
               </label>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-3">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   区间左端 a
                   <input value={intervalStart} onChange={(event) => setIntervalStart(event.target.value)} className="studio-input font-mono" />
@@ -448,7 +585,7 @@ export function ApproximationPanel() {
                 </label>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-2">
                 <button type="button" onClick={() => loadFunctionNodes("uniform")} className={experimentButtonClass}>
                   生成等距节点
                 </button>
@@ -470,68 +607,64 @@ export function ApproximationPanel() {
               </div>
             </div>
           )}
-          <div
-            className="grid items-start gap-6 xl:grid-cols-[minmax(320px,0.82fr)_minmax(420px,1.18fr)]"
-          >
-          <div className={`studio-card ${dataPointCardSpacing}`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+
+          <div className="studio-card space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                 <Table2 size={18} />
                 数据点
               </h2>
-              <div className="flex gap-2">
-                <button type="button" onClick={addPoint} className="step-control">
-                  <ListPlus size={14} />
-                  添加
-                </button>
-              </div>
+              <button type="button" onClick={addPoint} className="step-control">
+                <ListPlus size={14} />
+                添加
+              </button>
             </div>
 
-            <div className="max-h-[360px] overflow-auto rounded-xl border border-slate-200">
-              <table className={dataPointTableClass}>
-                <thead className="bg-slate-50 text-xs text-slate-600">
-                  <tr>
-                    <th className={dataPointCellClass}>i</th>
-                    <th className={dataPointCellClass}>x_i</th>
-                    <th className={dataPointCellClass}>y_i</th>
-                    {showDerivativeColumn ? <th className={dataPointCellClass}>y&apos;_i</th> : null}
-                    <th className="w-10 px-2 py-1.5"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {points.map((point, index) => (
-                    <tr key={point.id}>
-                      <td className={`${dataPointCellClass} text-xs text-slate-500`}>{index}</td>
-                      <td className={dataPointCellClass}>
-                        <input value={point.x} onChange={(event) => updatePoint(point.id, "x", event.target.value)} className={dataPointInputClass} />
-                      </td>
-                      <td className={dataPointCellClass}>
-                        <input value={point.y} onChange={(event) => updatePoint(point.id, "y", event.target.value)} className={dataPointInputClass} />
-                      </td>
-                      {showDerivativeColumn ? (
-                        <td className={dataPointCellClass}>
-                          <input
-                            value={point.derivative}
-                            onChange={(event) => updatePoint(point.id, "derivative", event.target.value)}
-                            className={dataPointInputClass}
-                          />
-                        </td>
-                      ) : null}
-                      <td className={dataPointCellClass}>
-                        <button
-                          type="button"
-                          onClick={() => removePoint(point.id)}
-                          disabled={points.length <= 2}
-                          className="step-control px-2"
-                          aria-label={`删除第 ${index + 1} 个点`}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+              {points.map((point, index) => (
+                <div key={point.id} className="rounded-xl border border-slate-200 bg-white p-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-500">#{index}</div>
+                    <button
+                      type="button"
+                      onClick={() => removePoint(point.id)}
+                      disabled={points.length <= 2}
+                      className="step-control px-2"
+                      aria-label={`删除第 ${index + 1} 个点`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="space-y-1 text-xs font-medium text-slate-600">
+                      x_i
+                      <input
+                        value={point.x}
+                        onChange={(event) => updatePoint(point.id, "x", event.target.value)}
+                        className={dataPointInputClass}
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-600">
+                      y_i
+                      <input
+                        value={point.y}
+                        onChange={(event) => updatePoint(point.id, "y", event.target.value)}
+                        className={dataPointInputClass}
+                      />
+                    </label>
+                    {showDerivativeColumn ? (
+                      <label className="col-span-2 space-y-1 text-xs font-medium text-slate-600">
+                        y&apos;_i
+                        <input
+                          value={point.derivative}
+                          onChange={(event) => updatePoint(point.id, "derivative", event.target.value)}
+                          className={dataPointInputClass}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="grid gap-2">
@@ -541,7 +674,7 @@ export function ApproximationPanel() {
                 className={pasteAreaClass}
                 placeholder={showDerivativeColumn ? "0 1 0\n1 2 2\n2 5 4" : "0 1\n1 2\n2 5"}
               />
-              <button type="button" onClick={applyPastedPoints} className="studio-primary-btn h-9 self-end text-xs">
+              <button type="button" onClick={applyPastedPoints} className="studio-primary-btn h-9 text-xs">
                 批量载入
               </button>
             </div>
@@ -554,7 +687,45 @@ export function ApproximationPanel() {
               <div className="text-xs text-slate-500">有效点数：{validPointCount}</div>
             )}
           </div>
+        </div>
+      </ModuleSidebarPortal>
 
+      <ModuleSidebarPortal tab="verify">
+        <ReliabilityPanel items={reliability} />
+      </ModuleSidebarPortal>
+
+      <ModuleSidebarPortal tab="data">
+        <SaveExperimentButton
+          module="approximation"
+          defaultName="插值逼近实验"
+          summary={
+            inputMode === "function" && functionResult
+              ? functionResult.title
+              : result
+                ? `${methodLabel(result.method)}: RMSE=${formatApproxNumber(result.metrics.rmse)}`
+                : "插值逼近配置"
+          }
+          payload={{
+            inputMode,
+            method,
+            degree,
+            queryText,
+            points,
+            functionExpression,
+            intervalStart,
+            intervalEnd,
+            parts,
+            sampleCount,
+            functionDegree,
+            result,
+            functionResult,
+          }}
+          disabled={!result && !functionResult}
+        />
+      </ModuleSidebarPortal>
+
+      <div className="workspace-container">
+        <section className="space-y-6">
           <div className="studio-card space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
@@ -569,10 +740,7 @@ export function ApproximationPanel() {
               <ApproximationPlot result={result} previewPoints={parsedDataPoints} />
             )}
           </div>
-          </div>
-        </section>
 
-        <aside className="space-y-6">
           <div className="studio-card space-y-4">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <Calculator size={18} />
@@ -609,7 +777,7 @@ export function ApproximationPanel() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
-                点击“计算”后显示公式、误差指标和查询值。
+                在左侧“参数”中点击计算后显示公式、误差指标和查询值。
               </div>
             )}
           </div>
@@ -748,8 +916,8 @@ export function ApproximationPanel() {
               </div>
             )}
           </div>
-        </aside>
+        </section>
       </div>
-    </div>
+    </>
   );
 }

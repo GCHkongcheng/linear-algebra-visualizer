@@ -28,7 +28,7 @@ export default function TwitterImage() {
         }}
       >
         <div style={{ fontSize: 60, fontWeight: 700 }}>{siteConfig.name}</div>
-        <div style={{ fontSize: 30, color: "#475569" }}>线性代数可视化与可验证计算工具</div>
+        <div style={{ fontSize: 30, color: "#475569" }}>数值分析可视化与可验证计算工具</div>
       </div>
     ),
     {
