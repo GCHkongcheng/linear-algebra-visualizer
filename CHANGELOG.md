@@ -14,6 +14,10 @@
 - 文档弹窗从纯文本展示升级为 Markdown 渲染，支持标题、列表、表格等常见语法。
 
 ### Commit Audit
+- 2026-05-31 20:54:37 | 提交：1
+  - 文件审查：新增 2，修改 2
+  - 变更范围：`package-lock.json`、`package.json`、`"\345\211\215\347\253\257\345\270\203\345\261\200\346\240\267\345\274\217\344\274\230\345\214\226\345\273\272\350\256\256.md"`、`"\351\241\271\347\233\256\344\274\230\345\214\226\345\273\272\350\256\256.md"`
+  - 风险提示：依赖清单变更，建议执行 npm install 并验证 build
 - 2026-05-31 19:55:07 | 提交：1
   - 文件审查：新增 9，修改 10
   - 变更范围：`.gitignore`、`package-lock.json`、`package.json`、`playwright.config.ts`、`src/app/page.tsx`、`src/components/approximation/ApproximationPanel.tsx`、`src/components/common/CoordinatePlot.tsx`、`src/components/workbench/LazyModulePanels.tsx`、`src/hooks/useMatrix.ts`、`src/lib/matrix-basic.ts`、`src/lib/matrix-core.ts`、`src/lib/matrix-decomposition.ts`、`src/lib/matrix-eigen.ts`、`src/lib/matrix-error-analysis.ts`、`src/lib/matrix-format.ts`、`src/lib/matrix-linear-system.ts`、`src/store/experiment-library.ts`、`src/store/matrix-library.ts`、`tests/ui/approximation.spec.ts`
