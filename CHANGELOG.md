@@ -14,6 +14,10 @@
 - 文档弹窗从纯文本展示升级为 Markdown 渲染，支持标题、列表、表格等常见语法。
 
 ### Commit Audit
+- 2026-05-31 14:29:48 | 提交：1
+  - 文件审查：新增 4，修改 12
+  - 变更范围：`README.md`、`package-lock.json`、`package.json`、`src/app/about/page.tsx`、`src/app/opengraph-image.tsx`、`src/app/page.tsx`、`src/app/twitter-image.tsx`、`src/components/approximation/ApproximationPanel.tsx`、`src/components/common/ExperimentTools.tsx`、`src/components/common/ModuleSidebarPortal.tsx`、`src/components/integration/IntegrationPanel.tsx`、`src/components/nonlinear/NonlinearSolverPanel.tsx`、`src/components/ode/OdePanel.tsx`、`src/lib/site.ts`、`src/store/experiment-library.ts`、`src/types/experiment.ts`
+  - 风险提示：涉及核心计算逻辑，建议运行 npm run test:math；依赖清单变更，建议执行 npm install 并验证 build；涉及前端交互，建议人工回归关键页面
 - 2026-05-31 00:15:11 | 提交：1
   - 文件审查：新增 13，修改 3
   - 变更范围：`scripts/test-math.ts`、`src/app/page.tsx`、`src/components/approximation/ApproximationPanel.tsx`、`src/components/common/CoordinatePlot.tsx`、`src/components/integration/IntegrationPanel.tsx`、`src/components/nonlinear/NonlinearSolverPanel.tsx`、`src/components/ode/OdePanel.tsx`、`src/lib/approximation-core.ts`、`src/lib/integration-core.ts`、`src/lib/nonlinear-core.ts`、`src/lib/ode-core.ts`、`src/types/approximation.ts`、`src/types/integration.ts`、`src/types/nonlinear.ts`、`src/types/ode.ts`、`tsconfig.math-tests.json`
