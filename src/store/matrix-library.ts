@@ -203,10 +203,22 @@ function normalizePersistedState(raw: unknown): {
   return { matrixInventory, activeMatrixId };
 }
 
+function reportStorageError(action: string, error: unknown) {
+  console.warn(`[matrix-library] localStorage ${action} failed`, error);
+}
+
 const matrixLibraryStorage: StateStorage = {
   getItem: (name) => {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(name);
+    let raw: string | null = null;
+
+    try {
+      raw = window.localStorage.getItem(name);
+    } catch (error) {
+      reportStorageError("read", error);
+      return null;
+    }
+
     if (!raw) return null;
 
     try {
@@ -221,22 +233,35 @@ const matrixLibraryStorage: StateStorage = {
           version: STORE_VERSION,
         };
         const serialized = JSON.stringify(migrated);
-        window.localStorage.setItem(name, serialized);
+        try {
+          window.localStorage.setItem(name, serialized);
+        } catch (error) {
+          reportStorageError("legacy migration", error);
+        }
         return serialized;
       }
 
       return raw;
-    } catch {
+    } catch (error) {
+      reportStorageError("parse", error);
       return null;
     }
   },
   setItem: (name, value) => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(name, value);
+    try {
+      window.localStorage.setItem(name, value);
+    } catch (error) {
+      reportStorageError("write", error);
+    }
   },
   removeItem: (name) => {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(name);
+    try {
+      window.localStorage.removeItem(name);
+    } catch (error) {
+      reportStorageError("remove", error);
+    }
   },
 };
 

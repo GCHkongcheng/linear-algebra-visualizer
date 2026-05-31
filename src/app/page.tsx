@@ -32,43 +32,55 @@ import { OperationButtonGroup } from "@/components/matrix/OperationButtonGroup";
 import { ToastHost, type ToastItem } from "@/components/matrix/ToastHost";
 import { SaveToLibraryButton } from "@/components/matrix/SaveToLibraryButton";
 import { StepCard } from "@/components/matrix/StepCard";
-import { ApproximationPanel } from "@/components/approximation/ApproximationPanel";
-import { IntegrationPanel } from "@/components/integration/IntegrationPanel";
-import { NonlinearSolverPanel } from "@/components/nonlinear/NonlinearSolverPanel";
-import { OdePanel } from "@/components/ode/OdePanel";
+import {
+  LazyApproximationPanel,
+  LazyIntegrationPanel,
+  LazyNonlinearSolverPanel,
+  LazyOdePanel,
+} from "@/components/workbench/LazyModulePanels";
 import { useMatrix, type MatrixHistorySnapshot } from "@/hooks/useMatrix";
 import {
-  analyzeConditionNumbers,
   applyPaste,
+  determinant,
+  normalizeMatrixInput,
+  numericValue,
+  toNumericMatrix,
+} from "@/lib/matrix-basic";
+import {
   choleskyDecomposition,
   choleskyResidual,
-  determinant,
-  eigsWithMathjs,
-  perturbNumericMatrix,
-  perturbNumericVector,
-  relativeEigenError,
-  relativeMatrixErrorInfinity,
-  relativeVectorErrorInfinity,
   luDecomposition,
   luDecompositionPlain,
   luResidual,
   luResidualPlain,
-  normalizeMatrixInput,
-  numericValue,
   qrDecomposition,
   qrOrthogonalityResidual,
   qrResidual,
+  svdDecomposition,
+  svdOrthogonalityResiduals,
+  svdResidual,
+} from "@/lib/matrix-decomposition";
+import {
+  analyzeConditionNumbers,
+  perturbNumericMatrix,
+  perturbNumericVector,
+  relativeMatrixErrorInfinity,
+  relativeVectorErrorInfinity,
+} from "@/lib/matrix-error-analysis";
+import {
+  eigsWithMathjs,
+  relativeEigenError,
+} from "@/lib/matrix-eigen";
+import {
   resizeInputMatrix,
+  toInputMatrix,
+} from "@/lib/matrix-format";
+import {
   solveLinearSystemByGaussJordan,
   solveLinearSystemIterative,
   solveLinearSystemWithSteps,
   solveNumericLinearSystem,
-  svdDecomposition,
-  svdOrthogonalityResiduals,
-  svdResidual,
-  toInputMatrix,
-  toNumericMatrix,
-} from "@/lib/matrix-core";
+} from "@/lib/matrix-linear-system";
 import type {
   CholeskyResult,
   DisplayMode,
@@ -3204,13 +3216,13 @@ export default function Home() {
             </div>
           )}
 
-          {activeTab === "nonlinear" && <NonlinearSolverPanel />}
+          {activeTab === "nonlinear" && <LazyNonlinearSolverPanel />}
 
-          {activeTab === "approximation" && <ApproximationPanel />}
+          {activeTab === "approximation" && <LazyApproximationPanel />}
 
-          {activeTab === "integration" && <IntegrationPanel />}
+          {activeTab === "integration" && <LazyIntegrationPanel />}
 
-          {activeTab === "ode" && <OdePanel />}
+          {activeTab === "ode" && <LazyOdePanel />}
 
           {activeTab === "errorAnalysis" && (
             <div className="workspace-container">

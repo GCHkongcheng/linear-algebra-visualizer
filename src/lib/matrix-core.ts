@@ -1,5 +1,5 @@
 import Fraction from "fraction.js";
-import { all, create } from "mathjs";
+import { eigs, evaluate, simplify } from "mathjs";
 
 import type {
   CholeskyResult,
@@ -16,47 +16,27 @@ import type {
   SVDResult,
   Step,
 } from "@/types/matrix";
+import {
+  EPS,
+  cloneMatrix,
+  formatNumber,
+  formatNumberPrecise,
+  toPreciseInputMatrix,
+} from "./matrix-format";
 
-const math = create(all, {});
-
-export const EPS = 1e-10;
-
-export function cloneMatrix(matrix: string[][]): string[][] {
-  return matrix.map((row) => row.slice());
-}
-
-export function resizeInputMatrix(
-  matrix: string[][],
-  rows: number,
-  cols: number,
-  fill = "0"
-): string[][] {
-  return Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols }, (_, c) =>
-      matrix[r]?.[c] !== undefined ? matrix[r][c] : fill
-    )
-  );
-}
-
-export function toInputMatrix(matrix: number[][]): string[][] {
-  return matrix.map((row) => row.map((value) => formatNumber(value)));
-}
-
-function formatNumberPrecise(value: number): string {
-  if (Math.abs(value) < EPS) return "0";
-  return value
-    .toFixed(12)
-    .replace(/\.0+$/, "")
-    .replace(/(\.\d*?)0+$/, "$1");
-}
-
-function toPreciseInputMatrix(matrix: number[][]): string[][] {
-  return matrix.map((row) => row.map((value) => formatNumberPrecise(value)));
-}
+export {
+  EPS,
+  cloneMatrix,
+  formatNumber,
+  formatNumberPrecise,
+  resizeInputMatrix,
+  toInputMatrix,
+  toPreciseInputMatrix,
+} from "./matrix-format";
 
 export function simplifyExpr(expr: string): string {
   try {
-    return math.simplify(expr).toString();
+    return simplify(expr).toString();
   } catch {
     return expr;
   }
@@ -73,7 +53,7 @@ export function numericValue(expr: string): number | null {
   }
 
   try {
-    const value = math.evaluate(trimmed);
+    const value = evaluate(trimmed);
     if (typeof value === "number" && Number.isFinite(value)) return value;
     return null;
   } catch {
@@ -86,12 +66,6 @@ export function isZeroExpr(expr: string): boolean {
   if (simplified === "0") return true;
   const numeric = numericValue(simplified);
   return numeric !== null ? Math.abs(numeric) < EPS : false;
-}
-
-export function formatNumber(value: number): string {
-  if (Math.abs(value) < EPS) return "0";
-  const rounded = Math.abs(value) >= 1000 ? value.toFixed(0) : value.toFixed(6);
-  return rounded.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
 function roundNumericLiterals(expr: string): string {
@@ -1334,7 +1308,7 @@ export function maxAbsAxMinusB(
 
 export function eigsWithMathjs(matrix: number[][]): EigenAnalysisResult | null {
   try {
-    const result = math.eigs(matrix as never) as {
+    const result = eigs(matrix as never) as {
       values: unknown;
       eigenvectors?: Array<{ value: unknown; vector: unknown }>;
     };

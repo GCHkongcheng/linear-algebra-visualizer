@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 export type PlotPoint = {
   x: number;
   y: number | null | undefined;
@@ -172,15 +174,65 @@ export function CoordinatePlot({
   includeZeroY = false,
   includeZeroX = false,
 }: CoordinatePlotProps) {
-  const validSeriesPoints = series.flatMap((item) =>
-    item.points.filter((point) => Number.isFinite(point.x) && isFiniteNumber(point.y))
-  ) as Array<{ x: number; y: number }>;
-  const validMarkers = markers.filter((point) => Number.isFinite(point.x) && isFiniteNumber(point.y)) as Array<
-    PlotMarker & { y: number }
-  >;
-  const allPoints = [...validSeriesPoints, ...validMarkers];
+  const plotModel = useMemo(() => {
+    const validSeriesPoints = series.flatMap((item) =>
+      item.points.filter((point) => Number.isFinite(point.x) && isFiniteNumber(point.y))
+    ) as Array<{ x: number; y: number }>;
+    const validMarkers = markers.filter((point) => Number.isFinite(point.x) && isFiniteNumber(point.y)) as Array<
+      PlotMarker & { y: number }
+    >;
+    const allPoints = [...validSeriesPoints, ...validMarkers];
 
-  if (allPoints.length < 2) {
+    if (allPoints.length < 2) {
+      return {
+        allPoints,
+        validMarkers,
+        plotWidth: 0,
+        plotHeight: 0,
+        xTicks: [] as number[],
+        yTicks: [] as number[],
+        xScale: (x: number) => x,
+        yScale: (y: number) => y,
+        hasZeroX: false,
+        hasZeroY: false,
+        zeroX: 0,
+        zeroY: 0,
+      };
+    }
+
+    const plotWidth = WIDTH - MARGIN.left - MARGIN.right;
+    const plotHeight = height - MARGIN.top - MARGIN.bottom;
+    const rawMinX = Math.min(...allPoints.map((point) => point.x), includeZeroX ? 0 : Infinity);
+    const rawMaxX = Math.max(...allPoints.map((point) => point.x), includeZeroX ? 0 : -Infinity);
+    const rawMinY = Math.min(...allPoints.map((point) => point.y), includeZeroY ? 0 : Infinity);
+    const rawMaxY = Math.max(...allPoints.map((point) => point.y), includeZeroY ? 0 : -Infinity);
+    const xRange = expandRange(rawMinX, rawMaxX, 0.04);
+    const yRange = expandRange(rawMinY, rawMaxY, 0.12);
+    const xTicks = makeTicks(xRange.min, xRange.max, 7);
+    const yTicks = makeTicks(yRange.min, yRange.max, 6);
+    const xScale = (x: number) => MARGIN.left + ((x - xRange.min) / (xRange.max - xRange.min)) * plotWidth;
+    const yScale = (y: number) =>
+      MARGIN.top + plotHeight - ((y - yRange.min) / (yRange.max - yRange.min)) * plotHeight;
+    const zeroX = xScale(0);
+    const zeroY = yScale(0);
+
+    return {
+      allPoints,
+      validMarkers,
+      plotWidth,
+      plotHeight,
+      xTicks,
+      yTicks,
+      xScale,
+      yScale,
+      hasZeroX: zeroX >= MARGIN.left && zeroX <= MARGIN.left + plotWidth,
+      hasZeroY: zeroY >= MARGIN.top && zeroY <= MARGIN.top + plotHeight,
+      zeroX,
+      zeroY,
+    };
+  }, [height, includeZeroX, includeZeroY, markers, series]);
+
+  if (plotModel.allPoints.length < 2) {
     return (
       <div
         className="flex items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white text-sm text-slate-500"
@@ -191,23 +243,19 @@ export function CoordinatePlot({
     );
   }
 
-  const plotWidth = WIDTH - MARGIN.left - MARGIN.right;
-  const plotHeight = height - MARGIN.top - MARGIN.bottom;
-  const rawMinX = Math.min(...allPoints.map((point) => point.x), includeZeroX ? 0 : Infinity);
-  const rawMaxX = Math.max(...allPoints.map((point) => point.x), includeZeroX ? 0 : -Infinity);
-  const rawMinY = Math.min(...allPoints.map((point) => point.y), includeZeroY ? 0 : Infinity);
-  const rawMaxY = Math.max(...allPoints.map((point) => point.y), includeZeroY ? 0 : -Infinity);
-  const xRange = expandRange(rawMinX, rawMaxX, 0.04);
-  const yRange = expandRange(rawMinY, rawMaxY, 0.12);
-  const xTicks = makeTicks(xRange.min, xRange.max, 7);
-  const yTicks = makeTicks(yRange.min, yRange.max, 6);
-  const xScale = (x: number) => MARGIN.left + ((x - xRange.min) / (xRange.max - xRange.min)) * plotWidth;
-  const yScale = (y: number) =>
-    MARGIN.top + plotHeight - ((y - yRange.min) / (yRange.max - yRange.min)) * plotHeight;
-  const zeroX = xScale(0);
-  const zeroY = yScale(0);
-  const hasZeroX = zeroX >= MARGIN.left && zeroX <= MARGIN.left + plotWidth;
-  const hasZeroY = zeroY >= MARGIN.top && zeroY <= MARGIN.top + plotHeight;
+  const {
+    validMarkers,
+    plotWidth,
+    plotHeight,
+    xTicks,
+    yTicks,
+    xScale,
+    yScale,
+    hasZeroX,
+    hasZeroY,
+    zeroX,
+    zeroY,
+  } = plotModel;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:ui": "playwright test",
     "test:math": "node scripts/run-math-tests.mjs",
     "setup:hooks": "node scripts/setup-git-hooks.mjs"
   },
@@ -23,6 +24,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

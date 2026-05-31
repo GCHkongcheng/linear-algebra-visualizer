@@ -1,22 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  EPS,
   applyPaste,
   computeOperationResult,
-  describeStep,
-  formatEigenComponent,
   formatValue,
   hasChinese,
   normalizeMatrixInput,
+  splitAugmentedMatrix,
+  toNumericMatrix,
+} from "@/lib/matrix-basic";
+import { formatEigenComponent } from "@/lib/matrix-eigen";
+import {
+  EPS,
   resizeInputMatrix,
+  toInputMatrix,
+} from "@/lib/matrix-format";
+import {
+  describeStep,
   solveLinearSystemByGaussJordan,
   solveLinearSystemIterative,
   solveLinearSystemWithSteps,
-  splitAugmentedMatrix,
-  toInputMatrix,
-  toNumericMatrix,
-} from "@/lib/matrix-core";
+} from "@/lib/matrix-linear-system";
 import type {
   DisplayMode,
   EigenComponent,

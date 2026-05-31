@@ -85,6 +85,23 @@ const EXPERIMENT_CASES: ExperimentCase[] = [
   },
 ];
 
+type FunctionAction =
+  | "uniformNodes"
+  | "chebyshevNodes"
+  | "rungeCompare"
+  | "chebyshevCompare"
+  | "continuousLeastSquares"
+  | "remez";
+
+const FUNCTION_ACTION_OPTIONS: Array<{ id: FunctionAction; label: string }> = [
+  { id: "uniformNodes", label: "生成等距节点" },
+  { id: "chebyshevNodes", label: "生成 Chebyshev 节点" },
+  { id: "rungeCompare", label: "等距 10/15/20 对比" },
+  { id: "chebyshevCompare", label: "Chebyshev 11/16/21 对比" },
+  { id: "continuousLeastSquares", label: "连续最佳平方" },
+  { id: "remez", label: "最佳一致逼近" },
+];
+
 function makePointId(): string {
   return `p-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -306,8 +323,6 @@ export function ApproximationPanel() {
   const dataPointInputClass = "studio-input h-8 min-w-0 px-2 font-mono text-xs";
   const pasteAreaClass =
     "min-h-16 rounded-xl border border-slate-200 bg-white px-2 py-2 font-mono text-xs text-slate-700 outline-none focus:border-orange-400";
-  const experimentButtonClass =
-    "inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700";
 
   const parsedDataPoints = useMemo(() => parseDataPointRows(points), [points]);
   const validPointCount = parsedDataPoints.length;
@@ -462,6 +477,16 @@ export function ApproximationPanel() {
     }
   };
 
+  const runFunctionAction = (action: FunctionAction) => {
+    if (action === "uniformNodes") {
+      loadFunctionNodes("uniform");
+    } else if (action === "chebyshevNodes") {
+      loadFunctionNodes("chebyshev");
+    } else {
+      runFunctionExperiment(action);
+    }
+  };
+
   return (
     <>
       <ModuleSidebarPortal tab="cases">
@@ -532,11 +557,11 @@ export function ApproximationPanel() {
               </div>
             </div>
           ) : (
-            <div className="studio-card space-y-4">
+            <div className="studio-card space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <LineChart size={18} />
-                  函数实验参数
+                  实验参数
                 </h2>
                 <button
                   type="button"
@@ -544,7 +569,7 @@ export function ApproximationPanel() {
                   className="studio-primary-btn inline-flex items-center gap-2"
                 >
                   <Play size={14} />
-                  计算当前节点
+                  计算
                 </button>
               </div>
 
@@ -557,53 +582,31 @@ export function ApproximationPanel() {
                 />
               </label>
 
-              <div className="grid gap-3">
-                <label className="space-y-1 text-sm font-medium text-slate-700">
-                  区间左端 a
-                  <input value={intervalStart} onChange={(event) => setIntervalStart(event.target.value)} className="studio-input font-mono" />
-                </label>
-                <label className="space-y-1 text-sm font-medium text-slate-700">
-                  区间右端 b
-                  <input value={intervalEnd} onChange={(event) => setIntervalEnd(event.target.value)} className="studio-input font-mono" />
-                </label>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 text-sm font-medium text-slate-700">
+                    区间左端 a
+                    <input value={intervalStart} onChange={(event) => setIntervalStart(event.target.value)} className="studio-input font-mono" />
+                  </label>
+                  <label className="space-y-1 text-sm font-medium text-slate-700">
+                    区间右端 b
+                    <input value={intervalEnd} onChange={(event) => setIntervalEnd(event.target.value)} className="studio-input font-mono" />
+                  </label>
+                </div>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   逼近次数
                   <input value={functionDegree} onChange={(event) => setFunctionDegree(event.target.value)} className="studio-input font-mono" />
                 </label>
-                <label className="space-y-1 text-sm font-medium text-slate-700">
-                  等分数 m
-                  <input value={parts} onChange={(event) => setParts(event.target.value)} className="studio-input font-mono" />
-                </label>
-                <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Chebyshev 节点数 n
-                  <input value={automaticChebyshevCount} readOnly className="studio-input bg-slate-100 font-mono text-slate-500" />
-                  <span className="block text-xs font-normal text-slate-500">自动取 m + 1</span>
-                </label>
-                <label className="space-y-1 text-sm font-medium text-slate-700">
-                  绘图采样数
-                  <input value={sampleCount} onChange={(event) => setSampleCount(event.target.value)} className="studio-input font-mono" />
-                </label>
-              </div>
-
-              <div className="grid gap-2">
-                <button type="button" onClick={() => loadFunctionNodes("uniform")} className={experimentButtonClass}>
-                  生成等距节点
-                </button>
-                <button type="button" onClick={() => loadFunctionNodes("chebyshev")} className={experimentButtonClass}>
-                  生成 Chebyshev 节点
-                </button>
-                <button type="button" onClick={() => runFunctionExperiment("rungeCompare")} className={experimentButtonClass}>
-                  等距 10/15/20 对比
-                </button>
-                <button type="button" onClick={() => runFunctionExperiment("chebyshevCompare")} className={experimentButtonClass}>
-                  Chebyshev 11/16/21 对比
-                </button>
-                <button type="button" onClick={() => runFunctionExperiment("continuousLeastSquares")} className={experimentButtonClass}>
-                  连续最佳平方
-                </button>
-                <button type="button" onClick={() => runFunctionExperiment("remez")} className={experimentButtonClass}>
-                  最佳一致逼近
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 text-sm font-medium text-slate-700">
+                    等分数 m
+                    <input value={parts} onChange={(event) => setParts(event.target.value)} className="studio-input font-mono" />
+                  </label>
+                  <label className="space-y-1 text-sm font-medium text-slate-700">
+                    绘图采样数
+                    <input value={sampleCount} onChange={(event) => setSampleCount(event.target.value)} className="studio-input font-mono" />
+                  </label>
+                </div>
               </div>
             </div>
           )}
@@ -678,6 +681,29 @@ export function ApproximationPanel() {
                 批量载入
               </button>
             </div>
+
+            {inputMode === "function" ? (
+              <label className="space-y-1 text-sm font-medium text-slate-700">
+                函数实验操作
+                <select
+                  value=""
+                  onChange={(event) => {
+                    const action = event.target.value as FunctionAction;
+                    if (action) {
+                      runFunctionAction(action);
+                    }
+                  }}
+                  className="studio-select w-full"
+                >
+                  <option value="">选择操作</option>
+                  {FUNCTION_ACTION_OPTIONS.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
             {feedback ? (
               <div className={`rounded-xl border px-3 py-2 text-xs ${feedback.tone === "error" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>

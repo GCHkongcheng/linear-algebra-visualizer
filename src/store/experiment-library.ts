@@ -49,18 +49,35 @@ function normalizeExperiment(raw: unknown): SavedExperimentRecord | null {
   };
 }
 
+function reportStorageError(action: string, error: unknown) {
+  console.warn(`[experiment-library] localStorage ${action} failed`, error);
+}
+
 const experimentStorage: StateStorage = {
   getItem: (name) => {
     if (typeof window === "undefined") return null;
-    return window.localStorage.getItem(name);
+    try {
+      return window.localStorage.getItem(name);
+    } catch (error) {
+      reportStorageError("read", error);
+      return null;
+    }
   },
   setItem: (name, value) => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(name, value);
+    try {
+      window.localStorage.setItem(name, value);
+    } catch (error) {
+      reportStorageError("write", error);
+    }
   },
   removeItem: (name) => {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(name);
+    try {
+      window.localStorage.removeItem(name);
+    } catch (error) {
+      reportStorageError("remove", error);
+    }
   },
 };
 
