@@ -1,4 +1,6 @@
-﻿import { formatValue } from "@/lib/matrix-core";
+﻿"use client";
+
+import { formatValue } from "@/lib/matrix-core";
 import type { DisplayMode } from "@/types/matrix";
 
 type MatrixGridProps = {
@@ -54,10 +56,17 @@ export function MatrixGrid({
             ? 56
             : 52;
 
+  const rowCount = matrix.length;
+
   return (
     <div className={`matrix-surface ${className}`}>
       <div className="matrix-scroll">
         <div
+          role="grid"
+          aria-label={editable ? "可编辑矩阵输入网格" : "矩阵显示网格"}
+          aria-rowcount={rowCount}
+          aria-colcount={colCount}
+          aria-readonly={!editable}
           className={`grid gap-2 ${useScrollLayout ? "matrix-grid-scroll" : "matrix-grid-fit"}`}
           style={{
             gridTemplateColumns: `repeat(${colCount}, minmax(${minCellWidth}px, 1fr))`,
@@ -78,10 +87,17 @@ export function MatrixGrid({
                 .filter(Boolean)
                 .join(" ");
 
+              // 构建 ARIA 标签
+              const ariaLabel = `第 ${r + 1} 行, 第 ${c + 1} 列${isPivot ? ", 主元" : ""}${isHighlightedRow ? ", 高亮行" : ""}${isAugmentedCol ? ", 增广列" : ""}`;
+
               if (editable) {
                 return (
                   <input
                     key={`${r}-${c}`}
+                    role="gridcell"
+                    aria-rowindex={r + 1}
+                    aria-colindex={c + 1}
+                    aria-label={ariaLabel}
                     value={inputMatrix?.[r]?.[c] ?? "0"}
                     onChange={(event) => onChange?.(r, c, event.target.value)}
                     onFocus={() => onCellFocus?.(r, c)}
@@ -97,7 +113,14 @@ export function MatrixGrid({
               }
 
               return (
-                <div key={`${r}-${c}`} className={cellClassName}>
+                <div
+                  key={`${r}-${c}`}
+                  role="gridcell"
+                  aria-rowindex={r + 1}
+                  aria-colindex={c + 1}
+                  aria-label={ariaLabel}
+                  className={cellClassName}
+                >
                   {formatValue(value, displayMode)}
                 </div>
               );

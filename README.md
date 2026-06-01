@@ -99,19 +99,32 @@
 src/
   app/
     page.tsx                 # 主工作台
+    error.tsx                # 路由级错误边界
     about/page.tsx           # 关于页
     robots.ts                # robots
     sitemap.ts               # sitemap
     manifest.ts              # Web App Manifest
   components/
     approximation/           # 插值与逼近面板
+    common/                  # 实验工具、图表与共享面板
     integration/             # 数值积分面板
     nonlinear/               # 非线性方程求根面板
     ode/                     # 常微分方程面板
     matrix/                  # 矩阵输入、矩阵库、步骤与 Toast
+    workbench/               # 线性代数工作台拆分模块
+  config/workbench.ts        # 工作台导航、案例与侧边栏配置
   hooks/useMatrix.ts         # 矩阵与线性方程组业务编排
+  hooks/useMatrixLibraryBridge.ts # 矩阵库与工作台模块桥接
+  hooks/useResponsiveNavDrawer.ts # 响应式导航抽屉
+  hooks/useToastQueue.ts     # Toast 队列、去重与自动关闭
+  hooks/useWorkbenchHistory.ts # 工作台撤销 / 重做快照
   lib/
-    matrix-core.ts           # 数值线性代数核心逻辑
+    matrix-basic.ts          # 基础矩阵工具与输入规范化
+    matrix-core.ts           # 数值线性代数格式化与通用逻辑
+    matrix-decomposition.ts  # LU / QR / Cholesky / SVD
+    matrix-eigen.ts          # 特征值与特征向量
+    matrix-error-analysis.ts # 条件数与扰动分析
+    matrix-linear-system.ts  # 线性方程组求解
     nonlinear-core.ts        # 非线性方程核心逻辑
     approximation-core.ts    # 插值与逼近核心逻辑
     integration-core.ts      # 数值积分核心逻辑

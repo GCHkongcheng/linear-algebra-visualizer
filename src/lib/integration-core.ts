@@ -6,6 +6,7 @@ import type {
   IntegrationOptions,
   IntegrationResult,
   IntegrationSample,
+  IntegrationSequenceRow,
   IntegrationTableRow,
 } from "@/types/integration";
 
@@ -38,6 +39,13 @@ export function createIntegrationFunction(expression: string): ScalarFunction {
   };
 }
 
+export function parseIntegrationNumber(input: string): number {
+  const trimmed = input.trim();
+  if (!trimmed) return Number.NaN;
+  const value = math.evaluate(trimmed);
+  return typeof value === "number" && Number.isFinite(value) ? value : Number.NaN;
+}
+
 function validateInterval(start: number, end: number): [number, number] {
   if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) {
     throw new Error("积分区间端点必须是不同的有限实数");
@@ -48,6 +56,13 @@ function validateInterval(start: number, end: number): [number, number] {
 function sanitizeSubdivisions(value: number | undefined, fallback: number): number {
   if (!Number.isFinite(value) || (value ?? 0) < 1) return fallback;
   return Math.floor(value as number);
+}
+
+function sanitizeErrorLimit(value: number | undefined): number | null {
+  if (value === undefined || value === null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return value;
 }
 
 function sampleFunction(fn: ScalarFunction, start: number, end: number, count: number): IntegrationSample[] {
@@ -98,11 +113,18 @@ function compositeSimpson(fn: ScalarFunction, start: number, end: number, subdiv
   return { value: normalizeNearZero((h / 3) * sum), nodes, subdivisions: n };
 }
 
-function rombergIntegration(fn: ScalarFunction, start: number, end: number, levels: number) {
+function rombergIntegration(
+  fn: ScalarFunction,
+  start: number,
+  end: number,
+  levels: number,
+  errorLimit: number | null
+) {
   const safeLevels = Math.max(2, Math.min(Math.floor(levels), 8));
   const table: number[][] = Array.from({ length: safeLevels }, () =>
     Array.from({ length: safeLevels }, () => 0)
   );
+  let usedLevels = safeLevels;
 
   for (let level = 0; level < safeLevels; level += 1) {
     const n = 2 ** level;
@@ -112,21 +134,59 @@ function rombergIntegration(fn: ScalarFunction, start: number, end: number, leve
       table[level][col] =
         (factor * table[level][col - 1] - table[level - 1][col - 1]) / (factor - 1);
     }
+
+    if (
+      errorLimit !== null &&
+      level >= 1 &&
+      Math.abs(table[level][level] - table[level - 1][level - 1]) <= errorLimit
+    ) {
+      usedLevels = level + 1;
+      break;
+    }
   }
 
-  const rows: IntegrationTableRow[] = table.map((row, level) => ({
+  const rows: IntegrationTableRow[] = table.slice(0, usedLevels).map((row, level) => ({
     level,
     values: row.map((value, index) => (index <= level ? normalizeNearZero(value) : null)),
   }));
-  const value = normalizeNearZero(table[safeLevels - 1][safeLevels - 1]);
-  const previous = table[safeLevels - 2][safeLevels - 2];
+  const lastIndex = usedLevels - 1;
+  const value = normalizeNearZero(table[lastIndex][lastIndex]);
+  const previous = table[lastIndex - 1][lastIndex - 1];
 
   return {
     value,
     table: rows,
-    subdivisions: 2 ** (safeLevels - 1),
+    sequence: buildRombergSequence(rows),
+    subdivisions: 2 ** lastIndex,
     errorEstimate: Math.abs(value - previous),
   };
+}
+
+function buildRombergSequence(table: IntegrationTableRow[]): IntegrationSequenceRow[] {
+  return table.map((row, level) => {
+    const Tn = row.values[0] ?? Number.NaN;
+    const Sn = row.values[1] ?? null;
+    const Cn = row.values[2] ?? null;
+    const Rn = row.values[3] ?? null;
+    const best = [...row.values].reverse().find((value) => value !== null) ?? null;
+    const previousBest =
+      level > 0
+        ? [...table[level - 1].values].reverse().find((value) => value !== null) ?? null
+        : null;
+
+    return {
+      level,
+      n: 2 ** level,
+      Tn: normalizeNearZero(Tn),
+      Sn: Sn === null ? null : normalizeNearZero(Sn),
+      Cn: Cn === null ? null : normalizeNearZero(Cn),
+      Rn: Rn === null ? null : normalizeNearZero(Rn),
+      error:
+        best === null || previousBest === null
+          ? null
+          : Math.abs(best - previousBest),
+    };
+  });
 }
 
 function gaussLegendreRule(count: number, start: number, end: number): Array<{ x: number; weight: number }> {
@@ -180,11 +240,13 @@ export function solveIntegration(options: IntegrationOptions): IntegrationResult
   const [start, end] = interval;
   const fn = createIntegrationFunction(options.expression);
   const sampleCount = options.sampleCount ?? 180;
+  const errorLimit = sanitizeErrorLimit(options.errorLimit);
   const method: IntegrationMethod = options.method;
   let solved: {
     value: number;
     nodes?: IntegrationNode[];
     table?: IntegrationTableRow[];
+    sequence?: IntegrationSequenceRow[];
     subdivisions: number;
     errorEstimate?: number | null;
   };
@@ -194,7 +256,7 @@ export function solveIntegration(options: IntegrationOptions): IntegrationResult
   } else if (method === "simpson") {
     solved = compositeSimpson(fn, start, end, options.subdivisions ?? 20);
   } else if (method === "romberg") {
-    solved = rombergIntegration(fn, start, end, options.rombergLevels ?? 5);
+    solved = rombergIntegration(fn, start, end, options.rombergLevels ?? 5, errorLimit);
   } else {
     solved = gaussLegendreIntegration(fn, start, end, options.gaussPoints ?? 8);
   }
@@ -208,7 +270,9 @@ export function solveIntegration(options: IntegrationOptions): IntegrationResult
     samples: sampleFunction(fn, start, end, sampleCount),
     nodes: solved.nodes ?? [],
     table: solved.table,
+    sequence: solved.sequence,
     errorEstimate: solved.errorEstimate ?? null,
+    errorLimit,
     message:
       method === "simpson" && (options.subdivisions ?? 20) % 2 !== 0
         ? "Simpson 复化公式要求偶数等分，已自动加 1"

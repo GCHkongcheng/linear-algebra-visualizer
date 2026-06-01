@@ -14,6 +14,16 @@ export type IntegrationTableRow = {
   values: Array<number | null>;
 };
 
+export type IntegrationSequenceRow = {
+  level: number;
+  n: number;
+  Tn: number;
+  Sn: number | null;
+  Cn: number | null;
+  Rn: number | null;
+  error: number | null;
+};
+
 export type IntegrationNode = {
   x: number;
   weight?: number;
@@ -29,7 +39,9 @@ export type IntegrationResult = {
   samples: IntegrationSample[];
   nodes: IntegrationNode[];
   table?: IntegrationTableRow[];
+  sequence?: IntegrationSequenceRow[];
   errorEstimate?: number | null;
+  errorLimit?: number | null;
   message?: string;
 };
 
@@ -41,5 +53,6 @@ export type IntegrationOptions = {
   subdivisions?: number;
   rombergLevels?: number;
   gaussPoints?: number;
+  errorLimit?: number;
   sampleCount?: number;
 };

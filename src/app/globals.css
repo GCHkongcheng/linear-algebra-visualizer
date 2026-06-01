@@ -2,10 +2,77 @@
 @plugin "@tailwindcss/typography";
 
 :root {
+  /* 基础色彩 */
   --background: #f8f4ee;
   --foreground: #1b1916;
   --accent: #ea580c;
   --grid-line: #e6ded2;
+
+  /* 主色系 - 橙色 */
+  --color-primary-50: #fff7ed;
+  --color-primary-100: #ffedd5;
+  --color-primary-200: #fed7aa;
+  --color-primary-500: #ea580c;
+  --color-primary-600: #dc2626;
+  --color-primary-700: #c2410c;
+  --color-primary-900: #7c2d12;
+
+  /* 中性色系 */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  /* 语义色 */
+  --color-success: #10b981;
+  --color-success-bg: #ecfdf5;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-error: #ef4444;
+  --color-error-bg: #fef2f2;
+  --color-info: #3b82f6;
+  --color-info-bg: #eff6ff;
+
+  /* 功能色 */
+  --color-pivot: #fed7aa;
+  --color-pivot-border: #fb923c;
+  --color-highlight: #ccfbf1;
+  --color-highlight-border: #2dd4bf;
+  --color-augmented: #94a3b8;
+
+  /* 间距系统 */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* 圆角系统 */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+
+  /* 阴影系统 */
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-sm: 0 1px 3px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 4px 6px rgb(15 23 42 / 0.1);
+  --shadow-lg: 0 10px 15px rgb(15 23 42 / 0.12);
+  --shadow-xl: 0 20px 25px rgb(15 23 42 / 0.15);
+
+  /* 过渡时长 */
+  --transition-fast: 0.15s;
+  --transition-base: 0.2s;
+  --transition-slow: 0.3s;
 }
 
 @theme inline {
@@ -71,12 +138,12 @@ body {
   border: 1px solid rgb(15 23 42 / 0.1);
   border-radius: 0.95rem;
   background: white;
-  color: rgb(71 85 105);
+  color: var(--color-neutral-700);
   padding: 0.58rem 0.78rem;
   font-size: 0.86rem;
   font-weight: 600;
   text-align: left;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base) ease;
 }
 
 .nav-tab:hover {
@@ -96,10 +163,10 @@ body {
 }
 
 .mode-chip {
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   border: 1px solid rgb(15 23 42 / 0.14);
   background: white;
-  color: rgb(71 85 105);
+  color: var(--color-neutral-700);
   padding: 0.23rem 0.66rem;
   font-size: 0.76rem;
   font-weight: 600;
@@ -127,13 +194,13 @@ body {
 }
 
 .operation-pill {
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   border: 1px solid transparent;
-  color: rgb(71 85 105);
+  color: var(--color-neutral-700);
   font-size: 0.74rem;
   font-weight: 600;
   padding: 0.33rem 0.68rem;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base) ease;
 }
 
 .operation-pill:hover {
@@ -303,9 +370,344 @@ body {
     font-size: 0.78rem;
     padding: 0.38rem 0.34rem;
   }
+
+  /* 移动端触摸目标优化 */
+  .nav-tab,
+  .operation-pill,
+  .studio-primary-btn,
+  .step-control {
+    min-height: 44px;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .mode-chip {
+    min-height: 36px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
 }
 
+/* 平板端优化 - 小平板 */
+@media (min-width: 641px) and (max-width: 768px) {
+  .studio-card {
+    padding: 1rem;
+  }
 
+  .workspace-grid {
+    gap: 1rem;
+  }
+
+  .matrix-cell {
+    font-size: 0.82rem;
+    padding: 0.45rem 0.4rem;
+  }
+}
+
+/* 平板端优化 - 大平板 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .workspace-grid {
+    gap: 1.25rem;
+  }
+
+  .matrix-cell {
+    font-size: 0.83rem;
+  }
+}
+
+/* 大屏幕优化 */
+@media (min-width: 1440px) {
+  body {
+    font-size: 16px;
+  }
+
+  .studio-card {
+    padding: 1.5rem;
+  }
+
+  .workspace-grid {
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .matrix-cell {
+    font-size: 0.88rem;
+    padding: 0.6rem 0.5rem;
+  }
+}
+
+/* 全局焦点样式 - 可访问性增强 */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 按钮焦点样式 */
+.studio-primary-btn:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(234 88 12 / 0.3);
+}
+
+.studio-primary-btn:active {
+  transform: scale(0.98);
+}
+
+/* 导航标签焦点 */
+.nav-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 操作按钮焦点 */
+.operation-pill:focus-visible,
+.mode-chip:focus-visible,
+.step-control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 输入框焦点增强 */
+.studio-input:focus-visible,
+.studio-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: rgb(234 88 12 / 0.6);
+}
+
+/* 矩阵输入焦点保持原样但增强 */
+.matrix-input:focus-visible {
+  outline: none;
+  border-color: rgb(234 88 12 / 0.6);
+  box-shadow: 0 0 0 3px rgb(251 146 60 / 0.25);
+}
+
+/* 减少动画以提升移动端性能 */
+@media (max-width: 640px) {
+  @media (prefers-reduced-motion: no-preference) {
+    * {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* 尊重用户的减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.symbol-keyboard-fab {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 1px solid rgb(15 23 42 / 0.14);
+  border-radius: 9999px;
+  background: rgb(15 23 42);
+  color: white;
+  box-shadow: 0 18px 35px -20px rgb(15 23 42 / 0.95);
+  transition:
+    transform var(--transition-base) ease,
+    background var(--transition-base) ease,
+    box-shadow var(--transition-base) ease;
+}
+
+.symbol-keyboard-fab:hover {
+  background: rgb(30 41 59);
+  box-shadow: 0 20px 38px -18px rgb(15 23 42 / 0.95);
+  transform: translateY(-1px);
+}
+
+.symbol-keyboard-backdrop {
+  display: none;
+  pointer-events: none;
+  background: transparent;
+}
+
+.symbol-keyboard-panel {
+  position: fixed;
+  right: 50%;
+  bottom: 0;
+  z-index: 75;
+  width: min(980px, calc(100vw - 1rem));
+  transform: translateX(50%);
+  border: 1px solid rgb(15 23 42 / 0.1);
+  border-bottom: none;
+  border-radius: 1rem 1rem 0 0;
+  background: rgb(239 240 246 / 0.98);
+  padding: 0.7rem 0.85rem calc(0.75rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -18px 42px -36px rgb(15 23 42 / 0.75);
+}
+
+.symbol-keyboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.symbol-keyboard-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgb(15 23 42);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.symbol-keyboard-header p {
+  margin-top: 0.18rem;
+  color: rgb(100 116 139);
+  font-size: 0.75rem;
+}
+
+.symbol-keyboard-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgb(15 23 42 / 0.12);
+  border-radius: 9999px;
+  background: white;
+  color: rgb(51 65 85);
+}
+
+.symbol-keyboard-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.78rem;
+  overflow-x: auto;
+}
+
+.symbol-keyboard-tab {
+  flex: 0 0 auto;
+  border: 1px solid rgb(15 23 42 / 0.12);
+  border-radius: 9999px;
+  background: white;
+  color: rgb(71 85 105);
+  padding: 0.36rem 0.78rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.symbol-keyboard-tab-active {
+  border-color: rgb(15 23 42);
+  background: rgb(15 23 42);
+  color: white;
+}
+
+.symbol-keyboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.symbol-keyboard-rows {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: 0.62rem;
+}
+
+.symbol-keyboard-row {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(2.2rem, 1fr));
+  gap: 0.42rem;
+}
+
+.symbol-key {
+  display: flex;
+  min-height: 3.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  border: 1px solid rgb(15 23 42 / 0.06);
+  border-radius: 0.7rem;
+  background: white;
+  color: rgb(15 23 42);
+  font-family: var(--font-mono);
+  font-size: 1.18rem;
+  font-weight: 700;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 0.04);
+  transition:
+    border-color var(--transition-base) ease,
+    background var(--transition-base) ease,
+    transform var(--transition-fast) ease;
+}
+
+.symbol-key:hover:not(:disabled) {
+  border-color: rgb(234 88 12 / 0.45);
+  background: rgb(255 247 237);
+  transform: translateY(-1px);
+}
+
+.symbol-key:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.symbol-key-control {
+  background: rgb(209 210 216);
+}
+
+.symbol-key span {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.symbol-key small {
+  color: rgb(100 116 139);
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+@media (min-width: 640px) {
+  .symbol-keyboard-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .symbol-keyboard-fab {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .symbol-keyboard-panel {
+    width: 100vw;
+    border-right: none;
+    border-left: none;
+    border-radius: 1rem 1rem 0 0;
+    padding-right: 0.45rem;
+    padding-left: 0.45rem;
+  }
+
+  .symbol-keyboard-row {
+    gap: 0.28rem;
+    grid-template-columns: repeat(9, minmax(2rem, 1fr));
+  }
+
+  .symbol-key {
+    min-height: 3.3rem;
+    font-size: 1rem;
+  }
+}
 
 
 

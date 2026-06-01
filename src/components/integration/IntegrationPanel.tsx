@@ -14,6 +14,7 @@ import { ModuleSidebarPortal } from "@/components/common/ModuleSidebarPortal";
 import { CoordinatePlot } from "@/components/common/CoordinatePlot";
 import {
   formatIntegrationNumber,
+  parseIntegrationNumber,
   solveIntegration,
 } from "@/lib/integration-core";
 import type { ComparisonRow, ExperimentCase, ReliabilityItem, ScanRow } from "@/types/experiment";
@@ -62,16 +63,18 @@ function solveSafely(options: {
   subdivisions: string;
   rombergLevels: string;
   gaussPoints: string;
+  errorLimit: string;
   sampleCount?: number;
 }): IntegrationResult {
   return solveIntegration({
     method: options.method,
     expression: options.expression,
-    intervalStart: Number(options.intervalStart),
-    intervalEnd: Number(options.intervalEnd),
+    intervalStart: parseIntegrationNumber(options.intervalStart),
+    intervalEnd: parseIntegrationNumber(options.intervalEnd),
     subdivisions: Number(options.subdivisions),
     rombergLevels: Number(options.rombergLevels),
     gaussPoints: Number(options.gaussPoints),
+    errorLimit: Number(options.errorLimit),
     sampleCount: options.sampleCount ?? 220,
   });
 }
@@ -168,6 +171,7 @@ export function IntegrationPanel() {
   const [subdivisions, setSubdivisions] = useState("20");
   const [rombergLevels, setRombergLevels] = useState("5");
   const [gaussPoints, setGaussPoints] = useState("8");
+  const [errorLimit, setErrorLimit] = useState("1e-8");
   const [result, setResult] = useState<IntegrationResult | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [comparisonRows, setComparisonRows] = useState<ComparisonRow[]>([]);
@@ -181,6 +185,7 @@ export function IntegrationPanel() {
     subdivisions,
     rombergLevels,
     gaussPoints,
+    errorLimit,
   };
 
   const compute = () => {
@@ -203,18 +208,21 @@ export function IntegrationPanel() {
       setIntervalStart("0");
       setIntervalEnd("pi");
       setSubdivisions("20");
+      setErrorLimit("1e-8");
       setMethod("simpson");
     } else if (caseId === "oscillation") {
       setExpression("sin(20*x)");
       setIntervalStart("0");
       setIntervalEnd("pi");
       setSubdivisions("80");
+      setErrorLimit("1e-8");
       setMethod("simpson");
     } else {
       setExpression("sqrt(x)");
       setIntervalStart("0");
       setIntervalEnd("1");
       setSubdivisions("40");
+      setErrorLimit("1e-6");
       setMethod("romberg");
     }
     setResult(null);
@@ -366,6 +374,15 @@ export function IntegrationPanel() {
                 className="studio-input font-mono disabled:bg-slate-100 disabled:text-slate-400"
               />
             </label>
+            <label className="space-y-1 text-sm font-medium text-slate-700">
+              误差限 ε
+              <input
+                value={errorLimit}
+                onChange={(event) => setErrorLimit(event.target.value)}
+                className="studio-input font-mono"
+                aria-label="误差限"
+              />
+            </label>
           </div>
 
           {feedback ? (
@@ -385,7 +402,7 @@ export function IntegrationPanel() {
           module="integration"
           defaultName="数值积分实验"
           summary={result ? `${methodLabel(result.method)}: ${formatIntegrationNumber(result.value)}` : "数值积分配置"}
-          payload={{ method, expression, intervalStart, intervalEnd, subdivisions, rombergLevels, gaussPoints, result, comparisonRows, scanRows }}
+          payload={{ method, expression, intervalStart, intervalEnd, subdivisions, rombergLevels, gaussPoints, errorLimit, result, comparisonRows, scanRows }}
           disabled={!result && comparisonRows.length === 0 && scanRows.length === 0}
         />
       </ModuleSidebarPortal>
@@ -419,6 +436,7 @@ export function IntegrationPanel() {
                   <div>积分值：<span className="font-mono">{formatIntegrationNumber(result.value)}</span></div>
                   <div>节点/等分规模：{result.subdivisions}</div>
                   <div>误差估计：<span className="font-mono">{formatIntegrationNumber(result.errorEstimate)}</span></div>
+                  <div>误差限：<span className="font-mono">{formatIntegrationNumber(result.errorLimit)}</span></div>
                 </div>
                 {result.message ? (
                   <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
@@ -447,6 +465,38 @@ export function IntegrationPanel() {
                             {formatIntegrationNumber(value)}
                           </td>
                         ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {result?.sequence?.length ? (
+            <div className="studio-card space-y-4">
+              <h2 className="text-lg font-semibold text-slate-900">外推序列</h2>
+              <div className="max-h-[360px] overflow-auto rounded-2xl border border-slate-200">
+                <table className="w-full min-w-[720px] text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2">n</th>
+                      <th className="px-3 py-2">T_n</th>
+                      <th className="px-3 py-2">S_n</th>
+                      <th className="px-3 py-2">C_n</th>
+                      <th className="px-3 py-2">R_n</th>
+                      <th className="px-3 py-2">误差</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white font-mono">
+                    {result.sequence.map((row) => (
+                      <tr key={`integration-sequence-${row.level}`}>
+                        <td className="bg-slate-50 px-3 py-2 text-slate-500">{row.n}</td>
+                        <td className="px-3 py-2">{formatIntegrationNumber(row.Tn)}</td>
+                        <td className="px-3 py-2">{formatIntegrationNumber(row.Sn)}</td>
+                        <td className="px-3 py-2">{formatIntegrationNumber(row.Cn)}</td>
+                        <td className="px-3 py-2">{formatIntegrationNumber(row.Rn)}</td>
+                        <td className="px-3 py-2">{formatIntegrationNumber(row.error)}</td>
                       </tr>
                     ))}
                   </tbody>
