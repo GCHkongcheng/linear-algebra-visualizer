@@ -14,6 +14,10 @@
 - 文档弹窗从纯文本展示升级为 Markdown 渲染，支持标题、列表、表格等常见语法。
 
 ### Commit Audit
+- 2026-06-02 09:53:47 | 提交：1
+  - 文件审查：修改 3
+  - 变更范围：`src/app/globals.css`、`src/components/common/SymbolKeyboard.tsx`、`tests/ui/symbol-keyboard.spec.ts`
+  - 风险提示：涉及前端交互，建议人工回归关键页面
 - 2026-06-02 09:47:09 | 提交：1
   - 文件审查：修改 5
   - 变更范围：`scripts/test-math.ts`、`src/components/integration/IntegrationPanel.tsx`、`src/lib/integration-core.ts`、`src/types/integration.ts`、`tests/ui/integration.spec.ts`
