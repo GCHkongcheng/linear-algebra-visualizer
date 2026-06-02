@@ -709,6 +709,7 @@ function testNumericalIntegration() {
   });
   assert.ok(Math.abs(romberg.value - 2) < 1e-10, "Romberg should accurately integrate sin on [0, pi]");
   assert.ok(romberg.table?.length === 6, "Romberg should expose convergence table");
+  assert.ok(romberg.convergence?.errorLimit === null, "Romberg should treat an omitted error limit as layer-controlled");
   assert.ok(romberg.sequence?.length === 6, "Romberg should expose extrapolation sequence");
   assert.ok(romberg.sequence?.[3]?.Tn !== null, "Romberg sequence should expose T_n");
   assert.ok(romberg.sequence?.[3]?.Sn !== null, "Romberg sequence should expose S_n");
@@ -726,6 +727,10 @@ function testNumericalIntegration() {
   assert.ok(
     (toleranceStoppedRomberg.table?.length ?? 0) < 8,
     "Romberg should stop early when the error limit is reached"
+  );
+  assert.ok(
+    toleranceStoppedRomberg.convergence?.stoppedEarly,
+    "Romberg convergence metadata should record early stopping"
   );
 
   const gauss = solveIntegration({

@@ -2,6 +2,7 @@ import { all, create } from "mathjs";
 
 import type {
   IntegrationMethod,
+  IntegrationConvergence,
   IntegrationNode,
   IntegrationOptions,
   IntegrationResult,
@@ -125,6 +126,7 @@ function rombergIntegration(
     Array.from({ length: safeLevels }, () => 0)
   );
   let usedLevels = safeLevels;
+  let stoppedEarly = false;
 
   for (let level = 0; level < safeLevels; level += 1) {
     const n = 2 ** level;
@@ -141,6 +143,7 @@ function rombergIntegration(
       Math.abs(table[level][level] - table[level - 1][level - 1]) <= errorLimit
     ) {
       usedLevels = level + 1;
+      stoppedEarly = true;
       break;
     }
   }
@@ -157,6 +160,16 @@ function rombergIntegration(
     value,
     table: rows,
     sequence: buildRombergSequence(rows),
+    convergence: {
+      errorLimit,
+      reached:
+        errorLimit === null
+          ? null
+          : Math.abs(value - previous) <= errorLimit,
+      stoppedEarly,
+      maxLevels: safeLevels,
+      usedLevels,
+    },
     subdivisions: 2 ** lastIndex,
     errorEstimate: Math.abs(value - previous),
   };
@@ -247,6 +260,7 @@ export function solveIntegration(options: IntegrationOptions): IntegrationResult
     nodes?: IntegrationNode[];
     table?: IntegrationTableRow[];
     sequence?: IntegrationSequenceRow[];
+    convergence?: IntegrationConvergence;
     subdivisions: number;
     errorEstimate?: number | null;
   };
@@ -271,6 +285,7 @@ export function solveIntegration(options: IntegrationOptions): IntegrationResult
     nodes: solved.nodes ?? [],
     table: solved.table,
     sequence: solved.sequence,
+    convergence: solved.convergence,
     errorEstimate: solved.errorEstimate ?? null,
     errorLimit,
     message:

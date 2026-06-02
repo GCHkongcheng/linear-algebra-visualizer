@@ -55,6 +55,23 @@ function methodLabel(method: IntegrationMethod): string {
   return METHOD_OPTIONS.find((item) => item.id === method)?.label ?? method;
 }
 
+function formatRombergConvergence(result: IntegrationResult): string {
+  const convergence = result.convergence;
+  if (!convergence || convergence.errorLimit === null) {
+    return `按指定层数计算（${result.table?.length ?? 0} 层）`;
+  }
+
+  if (convergence.stoppedEarly) {
+    return `达到误差限 ${formatIntegrationNumber(convergence.errorLimit)}，提前停止于第 ${convergence.usedLevels} 层`;
+  }
+
+  if (convergence.reached) {
+    return `达到误差限 ${formatIntegrationNumber(convergence.errorLimit)}`;
+  }
+
+  return `已达到最大层数 ${convergence.maxLevels}，误差仍高于 ${formatIntegrationNumber(convergence.errorLimit)}`;
+}
+
 function solveSafely(options: {
   method: IntegrationMethod;
   expression: string;
@@ -171,7 +188,7 @@ export function IntegrationPanel() {
   const [subdivisions, setSubdivisions] = useState("20");
   const [rombergLevels, setRombergLevels] = useState("5");
   const [gaussPoints, setGaussPoints] = useState("8");
-  const [errorLimit, setErrorLimit] = useState("1e-8");
+  const [errorLimit, setErrorLimit] = useState("");
   const [result, setResult] = useState<IntegrationResult | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [comparisonRows, setComparisonRows] = useState<ComparisonRow[]>([]);
@@ -208,21 +225,21 @@ export function IntegrationPanel() {
       setIntervalStart("0");
       setIntervalEnd("pi");
       setSubdivisions("20");
-      setErrorLimit("1e-8");
+      setErrorLimit("");
       setMethod("simpson");
     } else if (caseId === "oscillation") {
       setExpression("sin(20*x)");
       setIntervalStart("0");
       setIntervalEnd("pi");
       setSubdivisions("80");
-      setErrorLimit("1e-8");
+      setErrorLimit("");
       setMethod("simpson");
     } else {
       setExpression("sqrt(x)");
       setIntervalStart("0");
       setIntervalEnd("1");
       setSubdivisions("40");
-      setErrorLimit("1e-6");
+      setErrorLimit("");
       setMethod("romberg");
     }
     setResult(null);
@@ -375,11 +392,13 @@ export function IntegrationPanel() {
               />
             </label>
             <label className="space-y-1 text-sm font-medium text-slate-700">
-              误差限 ε
+              可选误差限 ε
               <input
                 value={errorLimit}
                 onChange={(event) => setErrorLimit(event.target.value)}
-                className="studio-input font-mono"
+                disabled={method !== "romberg"}
+                placeholder="留空则按层数计算"
+                className="studio-input font-mono disabled:bg-slate-100 disabled:text-slate-400"
                 aria-label="误差限"
               />
             </label>
@@ -436,7 +455,14 @@ export function IntegrationPanel() {
                   <div>积分值：<span className="font-mono">{formatIntegrationNumber(result.value)}</span></div>
                   <div>节点/等分规模：{result.subdivisions}</div>
                   <div>误差估计：<span className="font-mono">{formatIntegrationNumber(result.errorEstimate)}</span></div>
-                  <div>误差限：<span className="font-mono">{formatIntegrationNumber(result.errorLimit)}</span></div>
+                  {result.method === "romberg" ? (
+                    <div>
+                      收敛控制：
+                      <span className="font-mono">
+                        {formatRombergConvergence(result)}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
                 {result.message ? (
                   <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">

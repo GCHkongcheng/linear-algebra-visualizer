@@ -24,6 +24,14 @@ export type IntegrationSequenceRow = {
   error: number | null;
 };
 
+export type IntegrationConvergence = {
+  errorLimit: number | null;
+  reached: boolean | null;
+  stoppedEarly: boolean;
+  maxLevels: number;
+  usedLevels: number;
+};
+
 export type IntegrationNode = {
   x: number;
   weight?: number;
@@ -40,6 +48,7 @@ export type IntegrationResult = {
   nodes: IntegrationNode[];
   table?: IntegrationTableRow[];
   sequence?: IntegrationSequenceRow[];
+  convergence?: IntegrationConvergence;
   errorEstimate?: number | null;
   errorLimit?: number | null;
   message?: string;
