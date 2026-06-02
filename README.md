@@ -4,7 +4,7 @@
 
 预览网址：[math.gchkc.top](https://math.gchkc.top)
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/GCHkongcheng/linear-algebra-visualizer?style=social)](https://github.com/GCHkongcheng/linear-algebra-visualizer/stargazers)
+[![GitHub Repo stars](https://img.shields.io/github/stars/GCHkongcheng/numerical-analysis-studio?style=social)](https://github.com/GCHkongcheng/numerical-analysis-studio/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 一个面向学习与工程实践的数值分析可视化工作台。项目聚焦三件事：
@@ -224,15 +224,15 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.vercel.app
 
 ## 联系方式
 
-- GitHub: <https://github.com/GCHkongcheng/linear-algebra-visualizer>
+- GitHub: <https://github.com/GCHkongcheng/numerical-analysis-studio>
 - Email: 2839474636@qq.com
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=GCHkongcheng%2Flinear-algebra-visualizer&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=GCHkongcheng%2Fnumerical-analysis-studio&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/linear-algebra-visualizer&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/linear-algebra-visualizer&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=GCHkongcheng/linear-algebra-visualizer&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/numerical-analysis-studio&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/numerical-analysis-studio&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=GCHkongcheng/numerical-analysis-studio&type=date&legend=top-left" />
  </picture>
 </a>

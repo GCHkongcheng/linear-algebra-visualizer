@@ -1,5 +1,5 @@
 {
-  "name": "numerical-analysis-visualizer",
+  "name": "numerical-analysis-studio",
   "version": "0.1.0",
   "description": "An open-source visual workbench for numerical analysis, linear algebra, and verifiable computation.",
   "license": "MIT",
@@ -7,10 +7,10 @@
   "homepage": "https://math.gchkc.top",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GCHkongcheng/linear-algebra-visualizer.git"
+    "url": "git+https://github.com/GCHkongcheng/numerical-analysis-studio.git"
   },
   "bugs": {
-    "url": "https://github.com/GCHkongcheng/linear-algebra-visualizer/issues"
+    "url": "https://github.com/GCHkongcheng/numerical-analysis-studio/issues"
   },
   "scripts": {
     "dev": "next dev",

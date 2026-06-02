@@ -16,7 +16,7 @@ export const siteConfig = {
     "Next.js",
     "Math.js",
   ],
-  githubRepo: "https://github.com/GCHkongcheng/linear-algebra-visualizer",
+  githubRepo: "https://github.com/GCHkongcheng/numerical-analysis-studio",
   contactEmail: "2839474636@qq.com",
 };
 
@@ -38,5 +38,5 @@ export function getSiteUrl(): string {
   );
   if (fromVercel) return fromVercel;
 
-  return "https://numerical-analysis-visualizer.vercel.app";
+  return "https://numerical-analysis-studio.vercel.app";
 }
