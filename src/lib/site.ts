@@ -1,5 +1,5 @@
 export const siteConfig = {
-  name: "数值分析工作台",
+  name: "Numerical Analysis Studio",
   shortName: "数值分析",
   description:
     "面向数值分析学习与工程实践的可视化工具，支持线性代数计算、非线性方程求根、插值逼近、数值积分、常微分方程与误差分析。",

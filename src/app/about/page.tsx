@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     canonical: "/about",
   },
   openGraph: {
-    title: `${copy.title} | 数值分析工作台`,
+    title: `${copy.title} | ${siteConfig.name}`,
     description: copy.shareDesc,
     url: `${getSiteUrl()}/about`,
     siteName: siteConfig.name,
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${copy.title} | 数值分析工作台`,
+    title: `${copy.title} | ${siteConfig.name}`,
     description: copy.shareDesc,
   },
 };

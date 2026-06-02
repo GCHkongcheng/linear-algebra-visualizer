@@ -1,8 +1,11 @@
 # Numerical Analysis Studio
 
+中文名：数值分析工作台
+
 预览网址：[math.gchkc.top](https://math.gchkc.top)
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/GCHkongcheng/linear-algebra-visualizer?style=social)](https://github.com/GCHkongcheng/linear-algebra-visualizer/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 一个面向学习与工程实践的数值分析可视化工作台。项目聚焦三件事：
 
@@ -154,6 +157,17 @@ npm run setup:hooks
 - 自定义 Codex 命令：可配置 `hooks.codexChangelogCommand`，支持占位符
 - `{REPO_ROOT}` `{CHANGELOG}` `{COMMIT_MSG}` `{STAGED_DIFF}` `{STAGED_FILES}` `{SUBJECT}`
 
+## 开源维护与 Codex
+
+本项目是公开开源的教育与工程实践工具，维护重点包括数值算法正确性、交互可用性、回归测试与文档同步。
+
+Codex 当前用于辅助维护流程：
+
+- 审查已暂存改动，发现潜在回归与遗漏的测试场景
+- 自动整理 `CHANGELOG.md`，降低发布记录维护成本
+- 辅助定位数值算法边界案例、生成测试思路与重构建议
+- 规划后续 PR triage、发布检查与安全审查工作流
+
 ## 质量检查
 
 ```bash
@@ -203,6 +217,10 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.vercel.app
 - 让数值分析计算“可视、可证、可复用”
 - 在保证数学正确性的前提下，持续优化交互效率
 - 帮助用户理解算法条件、误差传播、收敛性与结果可信度
+
+## 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
 
 ## 联系方式
 

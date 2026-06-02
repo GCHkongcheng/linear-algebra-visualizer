@@ -1,7 +1,17 @@
 {
   "name": "numerical-analysis-visualizer",
   "version": "0.1.0",
-  "private": true,
+  "description": "An open-source visual workbench for numerical analysis, linear algebra, and verifiable computation.",
+  "license": "MIT",
+  "author": "GCHkongcheng",
+  "homepage": "https://math.gchkc.top",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GCHkongcheng/linear-algebra-visualizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GCHkongcheng/linear-algebra-visualizer/issues"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
