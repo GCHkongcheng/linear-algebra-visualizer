@@ -46,7 +46,7 @@ export function ToastHost({ toasts, onDismiss }: ToastHostProps) {
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto rounded-2xl border px-3 py-2 shadow-lg shadow-slate-900/10 backdrop-blur ${meta.className}`}
+            className={`toast-card pointer-events-auto rounded-2xl border px-3 py-2 shadow-lg shadow-slate-900/10 backdrop-blur ${meta.className}`}
           >
             <div className="flex items-start gap-2">
               <Icon size={16} className={`mt-0.5 shrink-0 ${meta.iconClassName}`} />

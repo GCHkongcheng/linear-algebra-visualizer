@@ -57,75 +57,78 @@ export function MatrixGrid({
             : 52;
 
   const rowCount = matrix.length;
+  const showMathBrackets = !editable;
 
   return (
-    <div className={`matrix-surface ${className}`}>
+    <div className={`matrix-surface ${showMathBrackets ? "matrix-surface-static" : ""} ${className}`}>
       <div className="matrix-scroll">
-        <div
-          role="grid"
-          aria-label={editable ? "可编辑矩阵输入网格" : "矩阵显示网格"}
-          aria-rowcount={rowCount}
-          aria-colcount={colCount}
-          aria-readonly={!editable}
-          className={`grid gap-2 ${useScrollLayout ? "matrix-grid-scroll" : "matrix-grid-fit"}`}
-          style={{
-            gridTemplateColumns: `repeat(${colCount}, minmax(${minCellWidth}px, 1fr))`,
-          }}
-        >
-          {matrix.map((row, r) =>
-            row.map((value, c) => {
-              const isPivot = pivot ? pivot.row === r && pivot.col === c : false;
-              const isHighlightedRow = highlightRows.includes(r);
-              const isAugmentedCol = augmentedIndex >= 0 && c === augmentedIndex;
+        <div className={showMathBrackets ? "matrix-tex-wrap" : undefined}>
+          <div
+            role="grid"
+            aria-label={editable ? "可编辑矩阵输入网格" : "矩阵显示网格"}
+            aria-rowcount={rowCount}
+            aria-colcount={colCount}
+            aria-readonly={!editable}
+            className={`grid gap-2 ${useScrollLayout ? "matrix-grid-scroll" : "matrix-grid-fit"}`}
+            style={{
+              gridTemplateColumns: `repeat(${colCount}, minmax(${minCellWidth}px, 1fr))`,
+            }}
+          >
+            {matrix.map((row, r) =>
+              row.map((value, c) => {
+                const isPivot = pivot ? pivot.row === r && pivot.col === c : false;
+                const isHighlightedRow = highlightRows.includes(r);
+                const isAugmentedCol = augmentedIndex >= 0 && c === augmentedIndex;
 
-              const cellClassName = [
-                "matrix-cell",
-                isPivot ? "matrix-cell-pivot" : "",
-                isHighlightedRow ? "matrix-cell-highlight" : "",
-                isAugmentedCol ? "matrix-cell-augmented" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
+                const cellClassName = [
+                  "matrix-cell",
+                  isPivot ? "matrix-cell-pivot" : "",
+                  isHighlightedRow ? "matrix-cell-highlight" : "",
+                  isAugmentedCol ? "matrix-cell-augmented" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
 
-              // 构建 ARIA 标签
-              const ariaLabel = `第 ${r + 1} 行, 第 ${c + 1} 列${isPivot ? ", 主元" : ""}${isHighlightedRow ? ", 高亮行" : ""}${isAugmentedCol ? ", 增广列" : ""}`;
+                // 构建 ARIA 标签
+                const ariaLabel = `第 ${r + 1} 行, 第 ${c + 1} 列${isPivot ? ", 主元" : ""}${isHighlightedRow ? ", 高亮行" : ""}${isAugmentedCol ? ", 增广列" : ""}`;
 
-              if (editable) {
+                if (editable) {
+                  return (
+                    <input
+                      key={`${r}-${c}`}
+                      role="gridcell"
+                      aria-rowindex={r + 1}
+                      aria-colindex={c + 1}
+                      aria-label={ariaLabel}
+                      value={inputMatrix?.[r]?.[c] ?? "0"}
+                      onChange={(event) => onChange?.(r, c, event.target.value)}
+                      onFocus={() => onCellFocus?.(r, c)}
+                      onPaste={(event) => {
+                        if (!onPasteMatrix) return;
+                        event.preventDefault();
+                        const text = event.clipboardData.getData("text");
+                        onPasteMatrix(r, c, text);
+                      }}
+                      className={`${cellClassName} matrix-input`}
+                    />
+                  );
+                }
+
                 return (
-                  <input
+                  <div
                     key={`${r}-${c}`}
                     role="gridcell"
                     aria-rowindex={r + 1}
                     aria-colindex={c + 1}
                     aria-label={ariaLabel}
-                    value={inputMatrix?.[r]?.[c] ?? "0"}
-                    onChange={(event) => onChange?.(r, c, event.target.value)}
-                    onFocus={() => onCellFocus?.(r, c)}
-                    onPaste={(event) => {
-                      if (!onPasteMatrix) return;
-                      event.preventDefault();
-                      const text = event.clipboardData.getData("text");
-                      onPasteMatrix(r, c, text);
-                    }}
-                    className={`${cellClassName} matrix-input`}
-                  />
+                    className={cellClassName}
+                  >
+                    {formatValue(value, displayMode)}
+                  </div>
                 );
-              }
-
-              return (
-                <div
-                  key={`${r}-${c}`}
-                  role="gridcell"
-                  aria-rowindex={r + 1}
-                  aria-colindex={c + 1}
-                  aria-label={ariaLabel}
-                  className={cellClassName}
-                >
-                  {formatValue(value, displayMode)}
-                </div>
-              );
-            })
-          )}
+              })
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { CircleHelp, Menu } from "lucide-react";
 import Link from "next/link";
 
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 import type { NavSection } from "@/types/workbench";
 
 type WorkbenchHeaderProps = {
@@ -17,7 +18,7 @@ export function WorkbenchHeader({
   onSectionSwitch,
 }: WorkbenchHeaderProps) {
   return (
-    <header className="mx-auto w-full max-w-6xl space-y-4">
+    <header className="mx-auto w-full max-w-[1540px] space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
@@ -33,10 +34,13 @@ export function WorkbenchHeader({
             数值分析实验室
           </div>
         </div>
-        <Link href="/about" className="step-control" aria-label="打开关于页面">
-          <CircleHelp size={14} />
-          关于页面
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link href="/about" className="header-icon-action step-control" aria-label="打开关于页面">
+            <CircleHelp size={14} />
+            <span className="header-action-label">关于页面</span>
+          </Link>
+        </div>
       </div>
       <h1 className="text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
         数值分析工作台

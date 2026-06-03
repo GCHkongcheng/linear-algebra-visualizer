@@ -23,7 +23,7 @@ export function WorkbenchLayout({
       <div className="min-h-screen px-6 py-10 text-[15px] text-slate-900">
       {header}
 
-      <div className="mx-auto mt-8 grid w-full max-w-6xl gap-6 lg:grid-cols-[300px_1fr]">
+      <div className="mx-auto mt-8 grid w-full max-w-[1540px] gap-6 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]">
         {sidebar}
         <main>{children}</main>
       </div>
@@ -31,7 +31,7 @@ export function WorkbenchLayout({
       <ToastHost toasts={toasts} onDismiss={onDismissToast} />
       <SymbolKeyboard />
 
-      <footer className="mx-auto mt-10 w-full max-w-6xl rounded-3xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-500">
+      <footer className="mx-auto mt-10 w-full max-w-[1540px] rounded-3xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-500">
         数值分析工作流 · 默认启用可验证计算
       </footer>
       </div>

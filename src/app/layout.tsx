@@ -85,9 +85,25 @@ export default function RootLayout({
     },
   };
 
+  const themeScript = `
+    (() => {
+      try {
+        const saved = localStorage.getItem("nas-theme");
+        const theme = saved === "dark" || saved === "light"
+          ? saved
+          : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  `;
+
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body className="antialiased">
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

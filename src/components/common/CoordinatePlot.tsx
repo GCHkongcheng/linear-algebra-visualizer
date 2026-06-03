@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo, useState, type PointerEvent } from "react";
 
 export type PlotPoint = {
   x: number;
@@ -35,6 +35,16 @@ type CoordinatePlotProps = {
   markers?: PlotMarker[];
   includeZeroY?: boolean;
   includeZeroX?: boolean;
+};
+
+type HoverPoint = {
+  id: string;
+  seriesLabel: string;
+  color: string;
+  x: number;
+  y: number;
+  px: number;
+  py: number;
 };
 
 const WIDTH = 760;
@@ -174,6 +184,9 @@ export function CoordinatePlot({
   includeZeroY = false,
   includeZeroX = false,
 }: CoordinatePlotProps) {
+  const gradientNamespace = useId().replace(/:/g, "");
+  const [hoverPoint, setHoverPoint] = useState<HoverPoint | null>(null);
+
   const plotModel = useMemo(() => {
     const validSeriesPoints = series.flatMap((item) =>
       item.points.filter((point) => Number.isFinite(point.x) && isFiniteNumber(point.y))
@@ -187,6 +200,7 @@ export function CoordinatePlot({
       return {
         allPoints,
         validMarkers,
+        hoverPoints: [] as HoverPoint[],
         plotWidth: 0,
         plotHeight: 0,
         xTicks: [] as number[],
@@ -215,10 +229,35 @@ export function CoordinatePlot({
       MARGIN.top + plotHeight - ((y - yRange.min) / (yRange.max - yRange.min)) * plotHeight;
     const zeroX = xScale(0);
     const zeroY = yScale(0);
+    const hoverPoints = [
+      ...series.flatMap((item) =>
+        item.points
+          .filter((point) => Number.isFinite(point.x) && isFiniteNumber(point.y))
+          .map((point, index) => ({
+            id: `${item.id}-${index}`,
+            seriesLabel: item.label,
+            color: item.color,
+            x: point.x,
+            y: point.y as number,
+            px: xScale(point.x),
+            py: yScale(point.y as number),
+          }))
+      ),
+      ...validMarkers.map((point) => ({
+        id: point.id,
+        seriesLabel: point.label ?? "数据点",
+        color: point.color,
+        x: point.x,
+        y: point.y,
+        px: xScale(point.x),
+        py: yScale(point.y),
+      })),
+    ];
 
     return {
       allPoints,
       validMarkers,
+      hoverPoints,
       plotWidth,
       plotHeight,
       xTicks,
@@ -245,6 +284,7 @@ export function CoordinatePlot({
 
   const {
     validMarkers,
+    hoverPoints,
     plotWidth,
     plotHeight,
     xTicks,
@@ -257,6 +297,47 @@ export function CoordinatePlot({
     zeroY,
   } = plotModel;
 
+  const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (!hoverPoints.length) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const svgX = ((event.clientX - rect.left) / rect.width) * WIDTH;
+    const svgY = ((event.clientY - rect.top) / rect.height) * height;
+    const isInsidePlot =
+      svgX >= MARGIN.left &&
+      svgX <= MARGIN.left + plotWidth &&
+      svgY >= MARGIN.top &&
+      svgY <= MARGIN.top + plotHeight;
+
+    if (!isInsidePlot) {
+      setHoverPoint(null);
+      return;
+    }
+
+    let nearest = hoverPoints[0];
+    let nearestDistance = Infinity;
+    for (const point of hoverPoints) {
+      const dx = point.px - svgX;
+      const dy = point.py - svgY;
+      const distance = dx * dx + dy * dy;
+      if (distance < nearestDistance) {
+        nearest = point;
+        nearestDistance = distance;
+      }
+    }
+
+    setHoverPoint(nearest);
+  };
+
+  const tooltipWidth = 150;
+  const tooltipHeight = 48;
+  const tooltipX = hoverPoint
+    ? Math.min(Math.max(hoverPoint.px + 12, MARGIN.left), WIDTH - tooltipWidth - 12)
+    : 0;
+  const tooltipY = hoverPoint
+    ? Math.min(Math.max(hoverPoint.py - tooltipHeight - 12, MARGIN.top), height - tooltipHeight - 12)
+    : 0;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <svg
@@ -265,29 +346,54 @@ export function CoordinatePlot({
         aria-label={ariaLabel}
         className="w-full"
         style={{ height }}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={() => setHoverPoint(null)}
       >
-        <rect width={WIDTH} height={height} fill="#fffaf4" />
+        <defs>
+          {series.map((item) => (
+            <linearGradient
+              key={`${item.id}-gradient`}
+              id={`${gradientNamespace}-${item.id}-area`}
+              x1="0"
+              x2="0"
+              y1="0"
+              y2="1"
+            >
+              <stop offset="0%" stopColor={item.color} stopOpacity="0.26" />
+              <stop offset="100%" stopColor={item.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+        <rect width={WIDTH} height={height} fill="var(--plot-bg)" />
         <rect
           x={MARGIN.left}
           y={MARGIN.top}
           width={plotWidth}
           height={plotHeight}
-          fill="#fffdf8"
-          stroke="#e2e8f0"
+          fill="var(--plot-panel-bg)"
+          stroke="var(--plot-grid)"
         />
         {xTicks.map((tick) => {
           const x = xScale(tick);
           return (
             <g key={`x-grid-${tick}`}>
-              <line x1={x} y1={MARGIN.top} x2={x} y2={MARGIN.top + plotHeight} stroke="#e2e8f0" />
+              <line
+                x1={x}
+                y1={MARGIN.top}
+                x2={x}
+                y2={MARGIN.top + plotHeight}
+                stroke="var(--plot-grid)"
+                pathLength={1}
+                className="plot-grid-line"
+              />
               <line
                 x1={x}
                 y1={MARGIN.top + plotHeight}
                 x2={x}
                 y2={MARGIN.top + plotHeight + 5}
-                stroke="#94a3b8"
+                stroke="var(--plot-axis-muted)"
               />
-              <text x={x} y={height - 18} textAnchor="middle" fontSize="10" fill="#64748b">
+              <text x={x} y={height - 18} textAnchor="middle" fontSize="10" fill="var(--plot-label)">
                 {formatTick(tick)}
               </text>
             </g>
@@ -297,9 +403,17 @@ export function CoordinatePlot({
           const y = yScale(tick);
           return (
             <g key={`y-grid-${tick}`}>
-              <line x1={MARGIN.left} y1={y} x2={MARGIN.left + plotWidth} y2={y} stroke="#e2e8f0" />
-              <line x1={MARGIN.left - 5} y1={y} x2={MARGIN.left} y2={y} stroke="#94a3b8" />
-              <text x={MARGIN.left - 9} y={y + 3} textAnchor="end" fontSize="10" fill="#64748b">
+              <line
+                x1={MARGIN.left}
+                y1={y}
+                x2={MARGIN.left + plotWidth}
+                y2={y}
+                stroke="var(--plot-grid)"
+                pathLength={1}
+                className="plot-grid-line"
+              />
+              <line x1={MARGIN.left - 5} y1={y} x2={MARGIN.left} y2={y} stroke="var(--plot-axis-muted)" />
+              <text x={MARGIN.left - 9} y={y + 3} textAnchor="end" fontSize="10" fill="var(--plot-label)">
                 {formatTick(tick)}
               </text>
             </g>
@@ -311,7 +425,7 @@ export function CoordinatePlot({
             y1={zeroY}
             x2={MARGIN.left + plotWidth}
             y2={zeroY}
-            stroke="#94a3b8"
+            stroke="var(--plot-axis)"
             strokeWidth="1.3"
           />
         ) : null}
@@ -321,20 +435,20 @@ export function CoordinatePlot({
             y1={MARGIN.top}
             x2={zeroX}
             y2={MARGIN.top + plotHeight}
-            stroke="#94a3b8"
+            stroke="var(--plot-axis)"
             strokeWidth="1.3"
           />
         ) : null}
-        <text x={MARGIN.left + plotWidth + 8} y={hasZeroY ? zeroY - 5 : MARGIN.top + plotHeight - 4} fontSize="11" fill="#475569">
+        <text x={MARGIN.left + plotWidth + 8} y={hasZeroY ? zeroY - 5 : MARGIN.top + plotHeight - 4} fontSize="11" fill="var(--plot-axis-label)">
           x
         </text>
-        <text x={hasZeroX ? zeroX + 6 : MARGIN.left + 6} y={MARGIN.top + 12} fontSize="11" fill="#475569">
+        <text x={hasZeroX ? zeroX + 6 : MARGIN.left + 6} y={MARGIN.top + 12} fontSize="11" fill="var(--plot-axis-label)">
           y
         </text>
         {series.flatMap((item) =>
           item.fillToZero
             ? buildAreaPaths(item.points, xScale, yScale, plotHeight).map((path, index) => (
-                <path key={`${item.id}-area-${index}`} d={path} fill={item.color} opacity="0.18" />
+                <path key={`${item.id}-area-${index}`} d={path} fill={`url(#${gradientNamespace}-${item.id}-area)`} />
               ))
             : []
         )}
@@ -366,21 +480,67 @@ export function CoordinatePlot({
                   width={radius * 2}
                   height={radius * 2}
                   fill={point.color}
-                  stroke="#fff"
+                  stroke="var(--plot-marker-ring)"
                   strokeWidth="1.2"
                   transform={`rotate(45 ${cx} ${cy})`}
                 />
               ) : (
-                <circle cx={cx} cy={cy} r={radius} fill={point.color} stroke="#fff" strokeWidth="1.2" />
+                <circle cx={cx} cy={cy} r={radius} fill={point.color} stroke="var(--plot-marker-ring)" strokeWidth="1.2" />
               )}
               {point.label ? (
-                <text x={cx + 7} y={cy - 7} fill="#475569" fontSize="10">
+                <text x={cx + 7} y={cy - 7} fill="var(--plot-axis-label)" fontSize="10">
                   {point.label}
                 </text>
               ) : null}
             </g>
           );
         })}
+        {hoverPoint ? (
+          <g className="plot-hover-layer" aria-hidden="true">
+            <line
+              x1={hoverPoint.px}
+              y1={MARGIN.top}
+              x2={hoverPoint.px}
+              y2={MARGIN.top + plotHeight}
+              stroke="var(--accent)"
+              strokeDasharray="5 5"
+              strokeOpacity="0.52"
+            />
+            <line
+              x1={MARGIN.left}
+              y1={hoverPoint.py}
+              x2={MARGIN.left + plotWidth}
+              y2={hoverPoint.py}
+              stroke="var(--accent)"
+              strokeDasharray="5 5"
+              strokeOpacity="0.52"
+            />
+            <circle
+              cx={hoverPoint.px}
+              cy={hoverPoint.py}
+              r="5"
+              fill="var(--plot-panel-bg)"
+              stroke={hoverPoint.color}
+              strokeWidth="2"
+            />
+            <rect
+              x={tooltipX}
+              y={tooltipY}
+              width={tooltipWidth}
+              height={tooltipHeight}
+              rx="10"
+              fill="var(--plot-tooltip-bg)"
+              stroke="var(--plot-tooltip-border)"
+            />
+            <circle cx={tooltipX + 13} cy={tooltipY + 15} r="4" fill={hoverPoint.color} />
+            <text x={tooltipX + 23} y={tooltipY + 18} fontSize="11" fontWeight="700" fill="var(--plot-tooltip-text)">
+              {hoverPoint.seriesLabel}
+            </text>
+            <text x={tooltipX + 12} y={tooltipY + 35} fontSize="11" fill="var(--plot-tooltip-muted)">
+              ({formatTick(hoverPoint.x)}, {formatTick(hoverPoint.y)})
+            </text>
+          </g>
+        ) : null}
       </svg>
       {series.length > 1 ? (
         <div className="flex flex-wrap gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs">
