@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { formatValue } from "@/lib/matrix-core";
 import type { DisplayMode } from "@/types/matrix";
@@ -61,8 +61,8 @@ export function MatrixGrid({
 
   return (
     <div className={`matrix-surface ${showMathBrackets ? "matrix-surface-static" : ""} ${className}`}>
-      <div className="matrix-scroll">
-        <div className={showMathBrackets ? "matrix-tex-wrap" : undefined}>
+      <div className={showMathBrackets ? "matrix-tex-wrap" : undefined}>
+        <div className="matrix-scroll">
           <div
             role="grid"
             aria-label={editable ? "可编辑矩阵输入网格" : "矩阵显示网格"}

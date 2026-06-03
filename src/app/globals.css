@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 :root {
@@ -182,7 +182,7 @@ html[data-theme="dark"] .studio-card {
 .studio-select,
 .studio-input {
   border: 1px solid rgb(15 23 42 / 0.14);
-  border-radius: 9999px;
+  border-radius: 0.9rem;
   background: var(--surface-strong);
   color: var(--foreground);
   padding: 0.3rem 0.8rem;
@@ -191,7 +191,6 @@ html[data-theme="dark"] .studio-card {
 
 .studio-input {
   width: 100%;
-  border-radius: 0.9rem;
 }
 
 .studio-primary-btn {
