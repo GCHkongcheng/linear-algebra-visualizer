@@ -16,7 +16,7 @@ test("determinant module computes the default matrix and exposes validation", as
 
   await expect(page.getByText(/det\(A\)\s*=\s*-1/)).toBeVisible();
 
-  await page.getByRole("button", { name: "验证" }).click();
+  await page.getByRole("tab", { name: "验证" }).click();
   await page.getByRole("button", { name: "开启正确性证据面板" }).click();
   await expect(page.getByText("行列式验证")).toBeVisible();
 });
@@ -33,7 +33,7 @@ test("decomposition module computes default LU decomposition", async ({ page }) 
   await expect(page.getByText("L（下三角矩阵）")).toBeVisible();
   await expect(page.getByText("U（上三角矩阵）")).toBeVisible();
 
-  await page.getByRole("button", { name: "验证" }).click();
+  await page.getByRole("tab", { name: "验证" }).click();
   await page.getByRole("button", { name: "开启正确性证据面板" }).click();
   await expect(page.getByText("分解正确性证据").first()).toBeVisible();
 });
@@ -41,7 +41,7 @@ test("decomposition module computes default LU decomposition", async ({ page }) 
 test("matrix library smart import can flow into determinant workspace", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "数据" }).click();
+  await page.getByRole("tab", { name: "数据" }).click();
   await page.getByRole("button", { name: "智能识别" }).click();
   await page
     .getByPlaceholder("1,1;2,2;3,3  或  1,2|3;4,5|6")
@@ -51,11 +51,11 @@ test("matrix library smart import can flow into determinant workspace", async ({
 
   await expect(page.getByText("识别矩阵", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "导航", exact: true }).click();
+  await page.getByRole("tab", { name: "导航", exact: true }).click();
   await page
     .getByRole("button", { name: "行列式 方阵体积因子与可逆性" })
     .click();
-  await page.getByRole("button", { name: "数据" }).click();
+  await page.getByRole("tab", { name: "数据" }).click();
   await page.getByRole("button", { name: "设为当前活动矩阵" }).click();
   await page.getByRole("button", { name: "计算行列式" }).click();
 

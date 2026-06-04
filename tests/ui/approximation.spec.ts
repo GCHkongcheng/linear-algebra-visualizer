@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 test("function experiment parameters stay compact and expose action dropdown", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "方程与逼近" }).click();
+  await page.getByRole("tab", { name: "方程与逼近" }).click();
   await page.getByRole("button", { name: "插值与逼近 数据点、曲线与误差" }).click();
-  await page.getByRole("button", { name: "参数" }).click();
+  await page.getByRole("tab", { name: "参数" }).click();
   await page.getByRole("button", { name: "函数实验" }).click();
 
   await expect(page.getByRole("heading", { name: "实验参数" })).toBeVisible();

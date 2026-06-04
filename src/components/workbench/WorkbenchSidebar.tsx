@@ -100,7 +100,7 @@ export function WorkbenchSidebar({
                         <span className="block">{tab.label}</span>
                         <span
                           className={`block text-[11px] font-medium ${
-                            activeTab === tab.id ? "text-slate-200 dark:text-sky-300/80" : "text-text-muted"
+                            activeTab === tab.id ? "text-slate-200" : "text-text-muted"
                           }`}
                         >
                           {tab.description}

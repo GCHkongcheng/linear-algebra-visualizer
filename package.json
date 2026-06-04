@@ -17,6 +17,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:math && npm run test:ui",
     "test:ui": "playwright test",
     "test:math": "node scripts/run-math-tests.mjs",
     "setup:hooks": "node scripts/setup-git-hooks.mjs"

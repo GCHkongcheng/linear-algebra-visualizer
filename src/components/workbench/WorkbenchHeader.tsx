@@ -64,7 +64,7 @@ export function WorkbenchHeader({
               onClick={() => onSectionSwitch(section.title)}
               className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 ${
                 isActive
-                  ? "bg-accent text-white dark:text-slate-950 shadow-sm"
+                  ? "bg-accent text-white shadow-sm"
                   : "text-text-muted hover:bg-surface-muted hover:text-foreground"
               }`}
             >

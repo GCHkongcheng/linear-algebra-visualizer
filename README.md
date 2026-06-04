@@ -2,138 +2,41 @@
 
 中文名：数值分析工作台
 
-预览网址：[math.gchkc.top](https://math.gchkc.top)
+Numerical Analysis Studio 是一个面向数值分析学习与工程实践的 Web 可视化工作台。它把矩阵计算、线性方程组、矩阵分解、特征分析、非线性方程、插值逼近、数值积分、常微分方程和误差分析放在同一个可交互流程里，强调结果可验证、过程可解释、数据可复用。
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/GCHkongcheng/numerical-analysis-studio?style=social)](https://github.com/GCHkongcheng/numerical-analysis-studio/stargazers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+- 线上预览：[https://math.gchkc.top](https://math.gchkc.top)
+- 仓库地址：[GCHkongcheng/numerical-analysis-studio](https://github.com/GCHkongcheng/numerical-analysis-studio)
+- 许可证：[MIT](LICENSE)
 
-一个面向学习与工程实践的数值分析可视化工作台。项目聚焦三件事：
+## 功能概览
 
-- 结果正确：核心算法提供残差、一致性校验与误差指标，避免“看起来对”但实际不可靠。
-- 过程可解释：支持步骤回放、迭代历史、收敛提示、主元交换原因说明与解类型判定。
-- 数据可复用：通过全局矩阵库实现跨模块流转，支持从线性代数计算继续进入误差分析与链式实验。
-
-## 功能总览
-
-### 1. 数值线性代数
-
-- 支持 `A+B`、`A-B`、`A*B`、`A^-1`、`A^2`、`转置`、`RREF`、`数乘`
-- 支持 `秩` 与 `行列式`，并在结果区展示具体数值
-- 支持线性方程组求解：`高斯消元`、`高斯-约旦`、`Jacobi`、`Gauss-Seidel`、`SOR`、`共轭梯度法`
-- 自动判定解类型：`无解 / 唯一解 / 无穷多解`
-- 输出 `rank(A)` 与 `rank([A|b])`
-- 迭代法自动计算谱半径 `ρ(B)`，给出“是否保证收敛”的判定提示
-
-### 2. 矩阵分解与特征分析
-
-- 分解支持：`LU（带主元）`、`LU（普通）`、`QR（Householder）`、`Cholesky`、`SVD`
-- 显示并校验分解残差：
-- LU：`maxAbs(PA - LU)`
-- QR：`maxAbs(A - QR)` 与 `maxAbs(Q^TQ - I)`
-- Cholesky：`maxAbs(A - LL^T)`
-- SVD：`maxAbs(A - UΣV^T)` 与正交性残差
-- 特征分析支持复数特征值与特征向量配对展示（`λi ↔ vi`）
-- 缺陷矩阵可识别并提示不可对角化
-
-### 3. 非线性方程求根
-
-- 支持常见一元非线性方程求根流程
-- 展示迭代历史、误差变化与收敛状态
-- 支持函数曲线与迭代点可视化，帮助理解初值、区间和步长对结果的影响
-
-### 4. 插值与逼近
-
-- 支持数据点输入与函数逼近实验
-- 展示插值曲线、原始数据点和误差趋势
-- 适合观察不同节点、阶数与采样密度对数值结果的影响
-
-### 5. 数值积分
-
-- 支持典型数值积分实验
-- 展示积分结果、误差估计与计算过程
-- 适合比较不同求积策略在平滑函数、振荡函数或局部变化较大函数上的表现
-
-### 6. 常微分方程数值解
-
-- 支持 ODE 初值问题的数值求解
-- 展示数值解曲线、步进数据与误差指标
-- 可用于比较步长、方法与精确解之间的差异
-
-### 7. 误差与稳定性分析
-
-- 支持条件数、矩阵扰动、向量扰动与相对误差对比
-- 可观察病态矩阵、近奇异矩阵和扰动放大现象
-- 将“算出答案”升级为“解释答案是否可信”
-
-### 8. 全局矩阵库（Matrix Library）
-
-- 使用 Zustand 全局状态管理
-- 支持保存、重命名、删除、设为当前活动矩阵
-- 支持普通矩阵与增广矩阵类型区分
-- localStorage 持久化，刷新后不丢失
-- 结果区可“一键存入库”，用于下一步链式计算
-
-### 9. 智能识别（Smart Import）
-
-- 侧边栏提供“智能识别”入口
-- 支持文本格式快速导入，例如：`1,1;2,2;3,3`
-- 支持增广分隔输入，例如：`1,2|3;4,5|6`
-- 支持拍照/扫码导入（浏览器支持 `BarcodeDetector` 时）
-- 导入后先进入可编辑预览，再保存到矩阵库
-
-### 10. 交互与体验
-
-- Container-based 响应式布局
-- 移动端矩阵输入支持内部平滑横向滚动，避免整页溢出
-- 侧边栏矩阵预览支持大矩阵滚动查看
-- 运算、求解、分解状态统一 Toast 反馈
+- 数值线性代数：矩阵加减乘、逆、转置、RREF、秩、行列式、数乘、平方。
+- 线性方程组：高斯消元、高斯-约旦、Jacobi、Gauss-Seidel、SOR、共轭梯度法，并展示解类型、秩和残差。
+- 矩阵分解：LU、带主元 LU、QR、Cholesky、SVD，并展示分解残差和正交性校验。
+- 特征分析：支持实数和复数特征值、特征向量配对、重数信息和不可对角化提示。
+- 非线性方程求根：支持常见一元求根方法，展示迭代历史、误差变化和收敛状态。
+- 插值与逼近：支持数据点插值、最小二乘、样条、函数实验和误差指标。
+- 数值积分：支持复合梯形、Simpson、Romberg、Gauss-Legendre 等求积策略。
+- 常微分方程：支持初值问题数值解、步进数据、精确解对比和误差指标。
+- 误差与稳定性：支持条件数、矩阵/向量扰动、相对误差和病态矩阵观察。
+- 全局矩阵库：基于 Zustand 和 localStorage，可保存、重命名、删除、复用矩阵。
+- 智能导入：支持文本矩阵和增广矩阵导入，例如 `1,2;3,4`、`1,2|3;4,5|6`。
 
 ## 技术栈
 
-- 框架：Next.js 16 + React 19 + TypeScript
-- 样式：Tailwind CSS 4 + Typography 插件
-- 图标：lucide-react
-- 数学计算：mathjs + fraction.js
-- 状态管理：zustand（含 persist）
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Math.js、fraction.js
+- Zustand
+- Lucide React
+- Playwright
 
-## 目录结构
+## 环境要求
 
-```text
-src/
-  app/
-    page.tsx                 # 主工作台
-    error.tsx                # 路由级错误边界
-    about/page.tsx           # 关于页
-    robots.ts                # robots
-    sitemap.ts               # sitemap
-    manifest.ts              # Web App Manifest
-  components/
-    approximation/           # 插值与逼近面板
-    common/                  # 实验工具、图表与共享面板
-    integration/             # 数值积分面板
-    nonlinear/               # 非线性方程求根面板
-    ode/                     # 常微分方程面板
-    matrix/                  # 矩阵输入、矩阵库、步骤与 Toast
-    workbench/               # 线性代数工作台拆分模块
-  config/workbench.ts        # 工作台导航、案例与侧边栏配置
-  hooks/useMatrix.ts         # 矩阵与线性方程组业务编排
-  hooks/useMatrixLibraryBridge.ts # 矩阵库与工作台模块桥接
-  hooks/useResponsiveNavDrawer.ts # 响应式导航抽屉
-  hooks/useToastQueue.ts     # Toast 队列、去重与自动关闭
-  hooks/useWorkbenchHistory.ts # 工作台撤销 / 重做快照
-  lib/
-    matrix-basic.ts          # 基础矩阵工具与输入规范化
-    matrix-core.ts           # 数值线性代数格式化与通用逻辑
-    matrix-decomposition.ts  # LU / QR / Cholesky / SVD
-    matrix-eigen.ts          # 特征值与特征向量
-    matrix-error-analysis.ts # 条件数与扰动分析
-    matrix-linear-system.ts  # 线性方程组求解
-    nonlinear-core.ts        # 非线性方程核心逻辑
-    approximation-core.ts    # 插值与逼近核心逻辑
-    integration-core.ts      # 数值积分核心逻辑
-    ode-core.ts              # ODE 核心逻辑
-  store/matrix-library.ts    # 全局矩阵库状态
-```
+- Node.js 20.9+，推荐使用当前 LTS 或项目验证过的 Node.js 22。
+- npm 10+。
 
 ## 本地运行
 
@@ -142,98 +45,112 @@ npm install
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)
+打开 [http://localhost:3000](http://localhost:3000)。
 
-## 提交时自动更新 CHANGELOG
+如需使用生产构建：
 
 ```bash
-# 初始化 Git Hook（只需一次）
-npm run setup:hooks
+npm run build
+npm run start
 ```
 
-- 默认行为：每次 `git commit` 会优先调用 `codex exec` 基于已暂存改动更新 `CHANGELOG.md` 的公开发布说明。
-- 回退行为：若本机不可用 Codex 或执行失败，会回退到本地规则，在 `Added / Changed / Fixed / Removed` 中生成一条简洁变更说明。
-- 手动优先：如果本次提交已经修改了 `CHANGELOG.md`，Hook 会跳过自动更新，避免重复写入。
-- 强制使用 Codex：设置环境变量 `CHANGELOG_REQUIRE_CODEX=1`，Codex 失败时会直接阻止提交。
-- 自定义 Codex 命令：可配置 `hooks.codexChangelogCommand`，支持占位符
-- `{REPO_ROOT}` `{CHANGELOG}` `{COMMIT_MSG}` `{STAGED_DIFF}` `{STAGED_FILES}` `{SUBJECT}`
+## 常用脚本
 
-## 开源维护与 Codex
+```bash
+npm run dev        # 启动本地开发服务器
+npm run build      # 生产构建
+npm run start      # 启动生产服务，需要先 build
+npm run lint       # ESLint 检查
+npm run typecheck  # TypeScript 类型检查
+npm run test:math  # 数学核心逻辑回归测试
+npm run test:ui    # Playwright UI 回归测试
+npm test           # 依次运行数学测试和 UI 测试
+```
 
-本项目是公开开源的教育与工程实践工具，维护重点包括数值算法正确性、交互可用性、回归测试与文档同步。
+## 环境变量
 
-Codex 当前用于辅助维护流程：
+项目没有必需的私密环境变量。可选配置：
 
-- 审查已暂存改动，发现潜在回归与遗漏的测试场景
-- 自动整理 `CHANGELOG.md`，降低发布记录维护成本
-- 辅助定位数值算法边界案例、生成测试思路与重构建议
-- 规划后续 PR triage、发布检查与安全审查工作流
+```bash
+NEXT_PUBLIC_SITE_URL=https://your-domain.example
+```
+
+`NEXT_PUBLIC_SITE_URL` 用于生成 metadata、robots、sitemap 和 manifest 中的站点 URL。可参考 [.env.example](.env.example)。
+
+## 目录结构
+
+```text
+src/
+  app/                       # Next.js App Router 页面、metadata、robots、sitemap、manifest
+  components/
+    approximation/           # 插值与逼近面板
+    common/                  # 通用图表、实验工具、主题和符号键盘
+    integration/             # 数值积分面板
+    matrix/                  # 矩阵输入、矩阵库、结果、步骤、Toast
+    nonlinear/               # 非线性方程求根面板
+    ode/                     # 常微分方程面板
+    workbench/               # 主工作台布局、导航和线性代数模块
+  config/                    # 工作台导航、标签页和案例配置
+  hooks/                     # 工作台状态编排、历史、Toast、响应式抽屉
+  lib/                       # 数值算法核心逻辑
+  store/                     # Zustand 全局状态
+  types/                     # 共享类型定义
+tests/ui/                    # Playwright UI 回归测试
+scripts/                     # 数学测试与 Git Hook 辅助脚本
+docs/archive/                # 历史设计与重构记录
+```
 
 ## 质量检查
 
-```bash
-# 类型检查
-npx tsc --noEmit
+交接前建议至少跑完：
 
-# 代码规范
+```bash
+npm ci
+npm run typecheck
 npm run lint
-
-# 数学回归测试
 npm run test:math
-
-# 生产构建
 npm run build
+npm run test:ui
 ```
 
-## 部署到 Vercel
+Playwright 测试会自动启动本地 dev server。若 Windows 上 `npm ci` 因原生依赖文件被占用失败，先确认没有正在运行的 `next dev` 或其它 Node 进程占用当前项目的 `node_modules`。
 
-1. 将仓库推送到 GitHub
-2. 在 Vercel 中导入项目
-3. 配置环境变量：
+## 部署
 
-```bash
-NEXT_PUBLIC_SITE_URL=https://your-domain.vercel.app
-```
+推荐部署到 Vercel：
 
-4. 点击 Deploy
+1. 推送仓库到 GitHub。
+2. 在 Vercel 导入项目。
+3. 设置可选环境变量 `NEXT_PUBLIC_SITE_URL`。
+4. 使用默认 Next.js 构建命令部署。
 
 项目已内置：
 
-- SEO metadata（title/description/open graph/twitter）
-- `robots.txt` / `sitemap.xml`
+- SEO metadata
+- Open Graph / Twitter image route
+- `robots.txt`
+- `sitemap.xml`
 - `manifest.webmanifest`
-- 安全响应头与静态资源缓存策略
+- 安全响应头和静态资源缓存策略
 
-## 输入格式示例
+## Git Hook
 
-- 文本矩阵：`1,2,3;4,5,6`
-- 逐行输入：
-- `1 2 3`
-- `4 5 6`
-- 增广矩阵：`1,2|3;4,5|6`
-- 支持 Excel/CSV 粘贴到矩阵输入网格
+项目提供可选的提交时 CHANGELOG 辅助脚本：
 
-## 项目目标
+```bash
+npm run setup:hooks
+```
 
-- 让数值分析计算“可视、可证、可复用”
-- 在保证数学正确性的前提下，持续优化交互效率
-- 帮助用户理解算法条件、误差传播、收敛性与结果可信度
+启用后，提交时会尝试根据暂存改动更新 [CHANGELOG.md](CHANGELOG.md)。如果本次提交已经手动修改 CHANGELOG，脚本会跳过自动写入。
 
-## 许可证
+## 维护说明
 
-本项目基于 [MIT License](LICENSE) 开源。
+- 数学算法变更优先补充或更新 `scripts/test-math.ts`。
+- 交互流程变更优先补充或更新 `tests/ui/`。
+- 工作台导航结构集中在 `src/config/workbench.ts`。
+- 交接状态、已知事项和后续建议见 [HANDOFF.md](HANDOFF.md)。
 
 ## 联系方式
 
 - GitHub: <https://github.com/GCHkongcheng/numerical-analysis-studio>
 - Email: 2839474636@qq.com
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=GCHkongcheng%2Fnumerical-analysis-studio&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/numerical-analysis-studio&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=GCHkongcheng/numerical-analysis-studio&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=GCHkongcheng/numerical-analysis-studio&type=date&legend=top-left" />
- </picture>
-</a>
